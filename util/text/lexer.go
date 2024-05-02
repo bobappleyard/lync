@@ -40,8 +40,10 @@ type moveTransition struct {
 
 type finalState[T any] struct {
 	Given LexerState
-	Then  func(start int, text string) T
+	Then  TokenConstructor[T]
 }
+
+type TokenConstructor[T any] func(start int, text string) T
 
 type Stream[T any] struct {
 	prog       *Lexer[T]
@@ -110,7 +112,7 @@ func (p *Lexer[T]) Empty(from, to LexerState) {
 // Indicate that a particular state is a final state, and attach a token constructor to it that will
 // be invoked if the machine terminates in that state. The behaviour is undefined if the machine
 // terminates in two final states, so be careful not to allow that to happen.
-func (p *Lexer[T]) Final(given LexerState, then func(start int, text string) T) {
+func (p *Lexer[T]) Final(given LexerState, then TokenConstructor[T]) {
 	p.finalStates = append(p.finalStates, finalState[T]{
 		Given: given,
 		Then:  then,

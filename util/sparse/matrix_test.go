@@ -3,7 +3,7 @@ package sparse
 import (
 	"testing"
 
-	"github.com/bobappleyard/link/util/assert"
+	"github.com/bobappleyard/lync/util/assert"
 )
 
 func TestMatrix_AddRow(t *testing.T) {

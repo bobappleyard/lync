@@ -1,14 +1,27 @@
 package assert
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
+
+	"github.com/r3labs/diff"
 )
 
 func Equal[T any](t testing.TB, got, expected T) {
 	t.Helper()
 	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("got %#v, expected %#v", got, expected)
+		cl, err := diff.Diff(expected, got)
+		if err != nil {
+			panic(err)
+		}
+		if cl != nil {
+			sb, err := json.MarshalIndent(cl, "", "\t")
+			if err != nil {
+				panic(err)
+			}
+			t.Errorf("Mismatched values\nDiff:\n%s", string(sb))
+		}
 	}
 }
 

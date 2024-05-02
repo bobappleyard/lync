@@ -244,8 +244,16 @@ func (r *regexRules) ParseRange(e charsetRange) term {
 	return match{start: '-', end: '-'}
 }
 
-func (r *regexRules) ParseSeq(left run, right run) run {
-	return seq{left: left, right: right}
+func (r *regexRules) ParseGroup(open groupOpen, e expr, close groupClose) term {
+	return nest{e}
+}
+
+func (r *regexRules) ParseCharset(op charsetOpen, contents charset, cl charsetClose) term {
+	return contents.eval()
+}
+
+func (r *regexRules) ParseInverseCharset(op charsetOpen, inv charsetInvert, contents charset, cl charsetClose) term {
+	return contents.inverse().eval()
 }
 
 func (r *regexRules) ParseEscaped(s slash) term {
@@ -253,6 +261,10 @@ func (r *regexRules) ParseEscaped(s slash) term {
 		return e.eval()
 	}
 	return match{start: s.of, end: s.of}
+}
+
+func (r *regexRules) ParseSeq(left run, right run) run {
+	return seq{left: left, right: right}
 }
 
 func (r *regexRules) ParseQuantifier(e term, q quantity) run {
@@ -269,18 +281,6 @@ func (r *regexRules) ParseQuantifier(e term, q quantity) run {
 
 func (r *regexRules) ParseChoice(left run, b bar, right run) expr {
 	return choice{left: left, right: right}
-}
-
-func (r *regexRules) ParseGroup(open groupOpen, e expr, close groupClose) term {
-	return nest{e}
-}
-
-func (r *regexRules) ParseCharset(op charsetOpen, contents charset, cl charsetClose) term {
-	return contents.eval()
-}
-
-func (r *regexRules) ParseInverseCharset(op charsetOpen, inv charsetInvert, contents charset, cl charsetClose) term {
-	return contents.inverse().eval()
 }
 
 func (r *regexRules) ParseCharsetChar(c char) charset {

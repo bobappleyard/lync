@@ -4,7 +4,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/bobappleyard/link/util/assert"
+	"github.com/bobappleyard/lync/util/assert"
 )
 
 func TestTokenization(t *testing.T) {

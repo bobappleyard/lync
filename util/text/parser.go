@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/bobappleyard/link/util/queue"
+	"github.com/bobappleyard/lync/util/queue"
 )
 
 type UnexpectedToken struct {
@@ -20,7 +20,7 @@ func (e *UnexpectedToken) Error() string {
 
 func Parse[T, U any](ruleSet any, toks []T) (U, error) {
 	s := &scanner{
-		hostType:  reflect.TypeOf(ruleSet),
+		host:      reflect.ValueOf(ruleSet),
 		tokenType: reflect.TypeOf(new(T)).Elem(),
 		rootType:  reflect.TypeOf(new(U)).Elem(),
 		types:     map[reflect.Type]*symbol{},
@@ -68,6 +68,9 @@ type rule struct {
 	// array of symbols to match
 	deps []*symbol
 
+	// the parser host
+	host reflect.Value
+
 	// index of method into host
 	index int
 
@@ -76,7 +79,7 @@ type rule struct {
 }
 
 type scanner struct {
-	hostType  reflect.Type
+	host      reflect.Value
 	tokenType reflect.Type
 	rootType  reflect.Type
 	types     map[reflect.Type]*symbol
@@ -84,7 +87,7 @@ type scanner struct {
 
 func (s *scanner) scan() *symbol {
 	s.ensure(s.rootType)
-	s.scanMethods()
+	s.scanMethods(s.host)
 	s.markTokenTypes()
 	s.markNullableTypes()
 	s.fillOutInterfaces()
@@ -92,9 +95,10 @@ func (s *scanner) scan() *symbol {
 	return s.types[s.rootType]
 }
 
-func (s *scanner) scanMethods() {
-	for i := s.hostType.NumMethod() - 1; i >= 0; i-- {
-		m := s.hostType.Method(i)
+func (s *scanner) scanMethods(host reflect.Value) {
+	hostType := host.Type()
+	for i := hostType.NumMethod() - 1; i >= 0; i-- {
+		m := hostType.Method(i)
 		if !m.IsExported() {
 			continue
 		}
@@ -102,13 +106,17 @@ func (s *scanner) scanMethods() {
 		for i := m.Type.NumIn() - 1; i >= 1; i-- {
 			deps[i-1] = s.ensure(m.Type.In(i))
 		}
+		if m.Type.Out(0).Kind() == reflect.Slice {
+			panic("explicit slice rules are not supported")
+		}
 		produces := s.ensure(m.Type.Out(0))
 		produces.predictions = append(produces.predictions, &rule{
 			implements: produces,
 			deps:       deps,
+			host:       host,
 			index:      m.Index,
 			method: func(host reflect.Value, args []reflect.Value) []reflect.Value {
-				return host.Type().Method(m.Index).Func.Call(args)
+				return m.Func.Call(args)
 			},
 		})
 	}
@@ -189,6 +197,7 @@ func (s *scanner) fillOutInterface(itfs *[]reflect.Type, todo reflect.Type) {
 			sym.predictions = append(sym.predictions, &rule{
 				implements: sym,
 				deps:       r.deps,
+				host:       r.host,
 				index:      r.index,
 				method:     r.method,
 			})
@@ -216,7 +225,40 @@ func (s *scanner) ensure(key reflect.Type) *symbol {
 	}
 	v := new(symbol)
 	s.types[key] = v
+	if key.Kind() == reflect.Slice {
+		s.sliceTypeSymbol(v, key)
+	} else if m, ok := key.MethodByName("Parser"); ok {
+		host := m.Func.Call([]reflect.Value{
+			reflect.New(key).Elem(),
+		})[0]
+		s.scanMethods(host)
+	}
 	return v
+}
+
+func (s *scanner) sliceTypeSymbol(sliceSym *symbol, slice reflect.Type) {
+	elem := slice.Elem()
+	elemSym := s.ensure(elem)
+	sliceSym.predictions = append(sliceSym.predictions, &rule{
+		implements: sliceSym,
+		deps:       []*symbol{},
+		host:       s.host,
+		index:      -1,
+		method: func(host reflect.Value, args []reflect.Value) []reflect.Value {
+			res := reflect.MakeSlice(slice, 0, 0)
+			return []reflect.Value{res}
+		},
+	})
+	sliceSym.predictions = append(sliceSym.predictions, &rule{
+		implements: sliceSym,
+		deps:       []*symbol{sliceSym, elemSym},
+		host:       s.host,
+		index:      -1,
+		method: func(host reflect.Value, args []reflect.Value) []reflect.Value {
+			res := reflect.Append(args[1], args[2])
+			return []reflect.Value{res}
+		},
+	})
 }
 
 type parser struct {
@@ -453,8 +495,9 @@ func (b *builder) buildFromSpan(host reflect.Value, s span) (reflect.Value, erro
 	if s.value.IsValid() {
 		return s.value, nil
 	}
+	r := s.item.rule
 	args := make([]reflect.Value, len(s.children)+1)
-	args[0] = host
+	args[0] = r.host
 	for i, c := range s.children {
 		child, err := b.buildFromSpan(host, c)
 		if err != nil {
@@ -463,7 +506,7 @@ func (b *builder) buildFromSpan(host reflect.Value, s span) (reflect.Value, erro
 		args[i+1] = child
 	}
 
-	rets := s.item.rule.method(host, args)
+	rets := r.method(r.host, args)
 	if len(rets) == 2 && !rets[1].IsNil() {
 		return reflect.Value{}, rets[1].Interface().(error)
 	}

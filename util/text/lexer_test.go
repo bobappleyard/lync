@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/bobappleyard/link/util/assert"
+	"github.com/bobappleyard/lync/util/assert"
 )
 
 func TestLexer(t *testing.T) {
