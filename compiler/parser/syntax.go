@@ -16,25 +16,10 @@ func Parse(src []byte) (ast.Program, error) {
 type syntax struct {
 }
 
-func (syntax) ParseProgram(stmts []ast.Stmt) ast.Program {
+func (syntax) ParseEmptyProgram(stmts blockList[ast.Stmt]) ast.Program {
 	return ast.Program{
-		Stmts: stripNoOps(stmts),
+		Stmts: stmts.stmts,
 	}
-}
-
-func (syntax) ParseNoOp(nl newlineTok) ast.Stmt {
-	return ast.NodeAt(nl.start(), ast.NoOp{})
-}
-
-func stripNoOps(stmts []ast.Stmt) []ast.Stmt {
-	var res []ast.Stmt
-	for _, s := range stmts {
-		if _, ok := s.(ast.NoOp); ok {
-			continue
-		}
-		res = append(res, s)
-	}
-	return res
 }
 
 func (syntax) ParseImport(imp importTok, path stringTok) ast.Stmt {
@@ -43,11 +28,26 @@ func (syntax) ParseImport(imp importTok, path stringTok) ast.Stmt {
 	})
 }
 
-func (syntax) ParseFunctionStmt(fn funcTok, name idTok, args argList[ast.Arg], _ openBTok, stmts []ast.Stmt, _ closeBTok) ast.Stmt {
+func (syntax) ParseFunctionStmt(fn funcTok, name idTok, args argList[ast.Arg], stmts block[ast.Stmt]) ast.Stmt {
 	return ast.NodeAt(fn.start(), ast.Method{
 		Name: name.text(),
 		Args: args.items,
-		Body: stripNoOps(stmts),
+		Body: stmts.stmts,
+	})
+}
+
+func (syntax) ParseClassStmt(class classTok, name idTok, members block[ast.Member]) ast.Stmt {
+	return ast.NodeAt(class.start(), ast.Class{
+		Name:    name.text(),
+		Members: members.stmts,
+	})
+}
+
+func (syntax) ParseFunctionExpr(fn funcTok, args argList[ast.Arg], stmts block[ast.Stmt]) ast.Expr {
+	return ast.NodeAt(fn.start(), ast.Method{
+		Name: "",
+		Args: args.items,
+		Body: stmts.stmts,
 	})
 }
 
@@ -63,6 +63,12 @@ func (syntax) ParseReturn(ret returnTok, value ast.Expr) ast.Stmt {
 	})
 }
 
+func (syntax) ParseEmptyReturn(ret returnTok) ast.Stmt {
+	return ast.NodeAt(ret.start(), ast.Return{
+		Value: ast.VariableRef{Var: "void"},
+	})
+}
+
 func (syntax) ParseVarDecl(v varTok, name idTok, _ eqTok, value ast.Expr) ast.Stmt {
 	return ast.NodeAt(v.start(), ast.Variable{
 		Name:  name.text(),
@@ -70,9 +76,28 @@ func (syntax) ParseVarDecl(v varTok, name idTok, _ eqTok, value ast.Expr) ast.St
 	})
 }
 
+func (syntax) ParseIf(ifT ifTok, cond ast.Expr, stmts block[ast.Stmt]) ast.Stmt {
+	return ast.NodeAt(ifT.start(), ast.If{
+		Cond: cond,
+		Then: stmts.stmts,
+	})
+}
+
 func (syntax) ParseString(s stringTok) ast.Expr {
 	return ast.NodeAt(s.start(), ast.StringConstant{
 		Value: s.value(),
+	})
+}
+
+func (syntax) ParseInt(i intTok) ast.Expr {
+	return ast.NodeAt(i.start(), ast.IntConstant{
+		Value: i.value(),
+	})
+}
+
+func (syntax) ParseFlt(f fltTok) ast.Expr {
+	return ast.NodeAt(f.start(), ast.FltConstant{
+		Value: f.value(),
 	})
 }
 
@@ -86,5 +111,12 @@ func (syntax) ParseMemberAccess(object ast.Expr, dot dotTok, id idTok) ast.Expr 
 	return ast.NodeAt(dot.start(), ast.MemberAccess{
 		Object: object,
 		Member: id.text(),
+	})
+}
+
+func (syntax) ParseCall(method ast.Expr, args argList[ast.Expr]) ast.Expr {
+	return ast.NodeAt(args.start, ast.Call{
+		Method: method,
+		Args:   args.items,
 	})
 }

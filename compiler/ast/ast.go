@@ -54,7 +54,7 @@ type Call struct {
 	astNodeData
 
 	Method Expr
-	Params []Expr
+	Args   []Expr
 }
 
 type Class struct {
@@ -91,6 +91,8 @@ func (Method) expr()         {}
 
 type Member interface {
 	member()
+
+	Node
 }
 
 // Statements
@@ -124,10 +126,19 @@ type NoOp struct {
 	astNodeData
 }
 
+type If struct {
+	astNodeData
+
+	Cond Expr
+	Then []Stmt
+	Else []Stmt
+}
+
 func (Return) stmt()   {}
 func (Variable) stmt() {}
 func (Import) stmt()   {}
 func (NoOp) stmt()     {}
+func (If) stmt()       {}
 
 func (StringConstant) stmt() {}
 func (IntConstant) stmt()    {}

@@ -47,6 +47,16 @@ func (t stringTok) value() string {
 	return v
 }
 
+func (t intTok) value() int {
+	v, _ := strconv.Atoi(t.text())
+	return v
+}
+
+func (t fltTok) value() float64 {
+	v, _ := strconv.ParseFloat(t.text(), 64)
+	return v
+}
+
 // punctuation
 
 type eqTok struct{ tokenData }
@@ -67,6 +77,15 @@ type funcTok struct{ tokenData }
 type ifTok struct{ tokenData }
 type importTok struct{ tokenData }
 type returnTok struct{ tokenData }
+
+var keywords = map[string]text.TokenConstructor[token]{
+	"var":    tokenType[varTok],
+	"class":  tokenType[classTok],
+	"func":   tokenType[funcTok],
+	"if":     tokenType[ifTok],
+	"import": tokenType[importTok],
+	"return": tokenType[returnTok],
+}
 
 func tokenize(src []byte) ([]token, error) {
 	toks, err := lexer.Tokenize(src).Force()
@@ -98,15 +117,6 @@ func tokenIsNewline(t token, context []token) bool {
 	n := len(context)
 	return (n == 0 || context[n-1].text() != "(") &&
 		strings.Contains(t.text(), "\n")
-}
-
-var keywords = map[string]text.TokenConstructor[token]{
-	"var":    tokenType[varTok],
-	"class":  tokenType[classTok],
-	"func":   tokenType[funcTok],
-	"if":     tokenType[ifTok],
-	"import": tokenType[importTok],
-	"return": tokenType[returnTok],
 }
 
 func tokenIdType(start int, text string) token {
