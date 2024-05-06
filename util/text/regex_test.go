@@ -193,7 +193,7 @@ func TestParse(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			toks, err := regexProg.Tokenize([]byte(test.in)).Force()
 			assert.Nil(t, err)
-			expr, err := Parse[token, expr](regexGrammar, toks)
+			expr, err := regexParser.Parse(toks)
 			assert.Nil(t, err)
 			assert.Equal(t, expr, test.out)
 		})

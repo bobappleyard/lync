@@ -59,7 +59,7 @@ func TestGrammar(t *testing.T) {
 		intTok{3},
 	}
 
-	expr, err := Parse[testTok, testExpr](ruleset{}, toks)
+	expr, err := NewParser[testTok, testExpr](ruleset{}).Parse(toks)
 	assert.Nil(t, err)
 	assert.Equal[testExpr](t, expr, add{
 		left:  add{left: intVal{value: 1}, right: intVal{value: 2}},
@@ -85,7 +85,7 @@ func TestNullableGrammar(t *testing.T) {
 		intTok{3},
 	}
 
-	expr, err := Parse[testTok, intList](nullableRuleset{}, toks)
+	expr, err := NewParser[testTok, intList](nullableRuleset{}).Parse(toks)
 	assert.Nil(t, err)
 	assert.Equal(t, intList{[]int{1, 2, 3}}, expr)
 }
@@ -108,7 +108,7 @@ func TestSliceGrammar(t *testing.T) {
 		intTok{3},
 	}
 
-	expr, err := Parse[testTok, intList](sliceRuleset{}, toks)
+	expr, err := NewParser[testTok, intList](sliceRuleset{}).Parse(toks)
 	assert.Nil(t, err)
 	assert.Equal(t, intList{[]int{1, 2, 3}}, expr)
 }
@@ -165,7 +165,7 @@ func TestReusableParser(t *testing.T) {
 		intTok{3},
 	}
 
-	expr, err := Parse[testTok, intList](polymorphicRuleset{}, toks)
+	expr, err := NewParser[testTok, intList](polymorphicRuleset{}).Parse(toks)
 	assert.Nil(t, err)
 	assert.Equal(t, intList{[]int{1, 2, 3}}, expr)
 

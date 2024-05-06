@@ -18,31 +18,42 @@ func (e *UnexpectedToken) Error() string {
 	return fmt.Sprintf("unexpected token: %#v", e.Token)
 }
 
-func Parse[T, U any](ruleSet any, toks []T) (U, error) {
+type Parser[T, U any] struct {
+	root    *symbol
+	ruleSet any
+}
+
+func NewParser[T, U any](ruleSet any) Parser[T, U] {
 	s := &scanner{
 		host:      reflect.ValueOf(ruleSet),
 		tokenType: reflect.TypeOf(new(T)).Elem(),
 		rootType:  reflect.TypeOf(new(U)).Elem(),
 		types:     map[reflect.Type]*symbol{},
 	}
-	// we could potentially cache this call
-	root := s.scan()
 
+	root := s.scan()
+	return Parser[T, U]{
+		root:    root,
+		ruleSet: ruleSet,
+	}
+}
+
+func (p Parser[T, U]) Parse(toks []T) (U, error) {
 	var zero U
 	tokVals := make([]reflect.Value, len(toks))
 	for i, t := range toks {
 		tokVals[i] = reflect.ValueOf(t)
 	}
 
-	p := &parser{
+	m := &matcher{
 		state: [][]item{nil},
 		toks:  tokVals,
 	}
-	if err := p.run(root); err != nil {
+	if err := m.run(p.root); err != nil {
 		return zero, err
 	}
 
-	rv, err := p.builder().build(root, reflect.ValueOf(ruleSet))
+	rv, err := m.builder().build(p.root, reflect.ValueOf(p.ruleSet))
 	if err != nil {
 		return zero, err
 	}
@@ -261,7 +272,7 @@ func (s *scanner) sliceTypeSymbol(sliceSym *symbol, slice reflect.Type) {
 	})
 }
 
-type parser struct {
+type matcher struct {
 	state [][]item
 	toks  []reflect.Value
 	cur   int
@@ -273,7 +284,7 @@ type item struct {
 	progress int
 }
 
-func (p *parser) run(root *symbol) error {
+func (p *matcher) run(root *symbol) error {
 	p.state = [][]item{nil}
 	p.predict(root)
 	for _, t := range p.toks {
@@ -286,7 +297,7 @@ func (p *parser) run(root *symbol) error {
 	return p.matches(root)
 }
 
-func (p *parser) step(tok reflect.Value) {
+func (p *matcher) step(tok reflect.Value) {
 	for i := 0; i < len(p.state[p.cur]); i++ {
 		item := p.state[p.cur][i]
 		next, ok := item.nextSymbol()
@@ -307,7 +318,7 @@ func (p *parser) step(tok reflect.Value) {
 	}
 }
 
-func (p *parser) finalStep() {
+func (p *matcher) finalStep() {
 	for i := 0; i < len(p.state[p.cur]); i++ {
 		item := p.state[p.cur][i]
 		next, ok := item.nextSymbol()
@@ -321,7 +332,7 @@ func (p *parser) finalStep() {
 	}
 }
 
-func (p *parser) matches(root *symbol) error {
+func (p *matcher) matches(root *symbol) error {
 	if len(p.state[len(p.state)-1]) == 0 {
 		for i := range p.state[1:] {
 			if len(p.state[i+1]) != 0 {
@@ -347,7 +358,7 @@ func (p *parser) matches(root *symbol) error {
 	return io.ErrUnexpectedEOF
 }
 
-func (p *parser) predict(s *symbol) {
+func (p *matcher) predict(s *symbol) {
 	for _, prediction := range s.predictions {
 		p.addToCur(item{
 			rule:     prediction,
@@ -356,15 +367,15 @@ func (p *parser) predict(s *symbol) {
 	}
 }
 
-func (p *parser) advance(x item) {
+func (p *matcher) advance(x item) {
 	p.addToCur(x.makeProgress())
 }
 
-func (p *parser) scan(x item) {
+func (p *matcher) scan(x item) {
 	p.addToNext(x.makeProgress())
 }
 
-func (p *parser) complete(x item) {
+func (p *matcher) complete(x item) {
 	for _, y := range p.state[x.position] {
 		next, ok := y.nextSymbol()
 		if !ok {
@@ -376,15 +387,15 @@ func (p *parser) complete(x item) {
 	}
 }
 
-func (p *parser) addToCur(x item) {
+func (p *matcher) addToCur(x item) {
 	p.addTo(p.cur, x)
 }
 
-func (p *parser) addToNext(x item) {
+func (p *matcher) addToNext(x item) {
 	p.addTo(p.cur+1, x)
 }
 
-func (p *parser) addTo(pos int, x item) {
+func (p *matcher) addTo(pos int, x item) {
 	for _, y := range p.state[pos] {
 		if x == y {
 			return
@@ -425,7 +436,7 @@ type span struct {
 	children []span
 }
 
-func (p *parser) builder() *builder {
+func (p *matcher) builder() *builder {
 	flipped := p.flipState()
 	for _, s := range flipped {
 		sort.Slice(s, func(i, j int) bool {
@@ -445,7 +456,7 @@ func (p *parser) builder() *builder {
 	}
 }
 
-func (p *parser) flipState() [][]item {
+func (p *matcher) flipState() [][]item {
 	flipped := make([][]item, len(p.state))
 	for i, set := range p.state {
 		for _, x := range set {

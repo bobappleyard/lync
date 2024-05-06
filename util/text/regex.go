@@ -15,7 +15,7 @@ func Regex[T any](re string, yield func(start int, text string) T) TokenSpec[T] 
 		if err != nil {
 			return err
 		}
-		e, err := Parse[token, expr](regexGrammar, s)
+		e, err := regexParser.Parse(s)
 		if err != nil {
 			return err
 		}
@@ -57,7 +57,7 @@ func (e nest) compile(prog programOps, start, end LexerState) {
 	e.nested.compile(prog, start, end)
 }
 
-var regexGrammar = &regexRules{map[rune]charset{
+var regexParser = NewParser[token, expr](&regexRules{map[rune]charset{
 	'n': {ranges: []match{
 		{start: '\n', end: '\n'},
 	}},
@@ -83,7 +83,7 @@ var regexGrammar = &regexRules{map[rune]charset{
 	'd': {ranges: []match{
 		{start: '0', end: '9'},
 	}},
-}}
+}})
 
 type token interface {
 	token()

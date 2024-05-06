@@ -10,13 +10,15 @@ func Parse(src []byte) (ast.Program, error) {
 	if err != nil {
 		return ast.Program{}, err
 	}
-	return text.Parse[token, ast.Program](syntax{}, toks)
+	return parser.Parse(toks)
 }
 
 type syntax struct {
 }
 
-func (syntax) ParseEmptyProgram(stmts blockList[ast.Stmt]) ast.Program {
+var parser = text.NewParser[token, ast.Program](syntax{})
+
+func (syntax) ParseProgram(stmts blockList[ast.Stmt]) ast.Program {
 	return ast.Program{
 		Stmts: stmts.stmts,
 	}
