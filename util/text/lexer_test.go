@@ -235,3 +235,7 @@ func TestTypedLexer(t *testing.T) {
 		})
 	}
 }
+
+func TestFailingLex(t *testing.T) {
+
+}

@@ -64,7 +64,7 @@ type Class struct {
 	Members []Member
 }
 
-type Method struct {
+type Function struct {
 	astNodeData
 
 	Name string
@@ -85,7 +85,7 @@ func (VariableRef) expr()    {}
 func (MemberAccess) expr()   {}
 func (Call) expr()           {}
 func (Class) expr()          {}
-func (Method) expr()         {}
+func (Function) expr()       {}
 
 // Class Members
 
@@ -94,6 +94,16 @@ type Member interface {
 
 	Node
 }
+
+type Method struct {
+	astNodeData
+
+	Name string
+	Args []Arg
+	Body []Stmt
+}
+
+func (Method) member() {}
 
 // Statements
 
@@ -147,4 +157,4 @@ func (VariableRef) stmt()    {}
 func (MemberAccess) stmt()   {}
 func (Call) stmt()           {}
 func (Class) stmt()          {}
-func (Method) stmt()         {}
+func (Function) stmt()       {}

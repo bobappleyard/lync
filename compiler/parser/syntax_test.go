@@ -163,7 +163,7 @@ func TestSyntax(t *testing.T) {
 							Member: "method",
 						},
 						Args: []ast.Expr{
-							ast.Method{
+							ast.Function{
 								Args: []ast.Arg{{Name: "x"}},
 								Body: []ast.Stmt{
 									ast.Return{Value: ast.VariableRef{Var: "x"}},
@@ -179,7 +179,7 @@ func TestSyntax(t *testing.T) {
 			in:   `func f(a, b, c) { return a }`,
 			out: ast.Program{
 				Stmts: []ast.Stmt{
-					ast.Method{
+					ast.Function{
 						Name: "f",
 						Args: []ast.Arg{{Name: "a"}, {Name: "b"}, {Name: "c"}},
 						Body: []ast.Stmt{
@@ -194,7 +194,7 @@ func TestSyntax(t *testing.T) {
 			in:   `func f() { return a }`,
 			out: ast.Program{
 				Stmts: []ast.Stmt{
-					ast.Method{
+					ast.Function{
 						Name: "f",
 						Body: []ast.Stmt{
 							ast.Return{Value: ast.VariableRef{Var: "a"}},
@@ -211,7 +211,7 @@ func TestSyntax(t *testing.T) {
 			}`,
 			out: ast.Program{
 				Stmts: []ast.Stmt{
-					ast.Method{
+					ast.Function{
 						Name: "f",
 						Args: []ast.Arg{{Name: "x"}},
 						Body: []ast.Stmt{
@@ -235,7 +235,7 @@ func TestSyntax(t *testing.T) {
 			}`,
 			out: ast.Program{
 				Stmts: []ast.Stmt{
-					ast.Method{
+					ast.Function{
 						Name: "f",
 						Args: []ast.Arg{{Name: "x"}, {Name: "y"}},
 						Body: []ast.Stmt{
@@ -256,11 +256,11 @@ func TestSyntax(t *testing.T) {
 			}`,
 			out: ast.Program{
 				Stmts: []ast.Stmt{
-					ast.Method{
+					ast.Function{
 						Name: "f",
 						Args: []ast.Arg{{Name: "x"}},
 						Body: []ast.Stmt{
-							ast.Method{
+							ast.Function{
 								Name: "g",
 								Body: []ast.Stmt{
 									ast.Variable{
@@ -306,6 +306,29 @@ func TestSyntax(t *testing.T) {
 			},
 		},
 		{
+			name: "ClassWithMethod",
+			in: `class A {
+				name() {
+					return "A"
+				}
+			}`,
+			out: ast.Program{
+				Stmts: []ast.Stmt{
+					ast.Class{
+						Name: "A",
+						Members: []ast.Member{
+							ast.Method{
+								Name: "name",
+								Body: []ast.Stmt{
+									ast.Return{Value: ast.StringConstant{Value: "A"}},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "SemiRealProgram",
 			in: `
 				import "array"
@@ -326,11 +349,11 @@ func TestSyntax(t *testing.T) {
 			out: ast.Program{
 				Stmts: []ast.Stmt{
 					ast.Import{Path: "array"},
-					ast.Method{
+					ast.Function{
 						Name: "loop",
 						Args: []ast.Arg{{Name: "f"}},
 						Body: []ast.Stmt{
-							ast.Method{
+							ast.Function{
 								Name: "step",
 								Args: []ast.Arg{{Name: "a"}, {Name: "i"}},
 								Body: []ast.Stmt{
@@ -387,7 +410,7 @@ func TestSyntax(t *testing.T) {
 								},
 							},
 							ast.Return{
-								Value: ast.Method{
+								Value: ast.Function{
 									Args: []ast.Arg{{Name: "a"}},
 									Body: []ast.Stmt{
 										ast.Return{

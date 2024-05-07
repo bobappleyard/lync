@@ -171,6 +171,11 @@ func (l *Stream[T]) exec() bool {
 
 		l.closeState()
 		l.detectFinal(&final, &end, pos)
+
+		if pos >= len(l.src) {
+			break
+		}
+
 		l.moveState(&running, c)
 
 		l.this, l.next = l.next, l.this

@@ -31,7 +31,7 @@ func (syntax) ParseImport(imp importTok, path stringTok) ast.Stmt {
 }
 
 func (syntax) ParseFunctionStmt(fn funcTok, name idTok, args argList[ast.Arg], stmts block[ast.Stmt]) ast.Stmt {
-	return ast.NodeAt(fn.start(), ast.Method{
+	return ast.NodeAt(fn.start(), ast.Function{
 		Name: name.text(),
 		Args: args.items,
 		Body: stmts.stmts,
@@ -46,7 +46,7 @@ func (syntax) ParseClassStmt(class classTok, name idTok, members block[ast.Membe
 }
 
 func (syntax) ParseFunctionExpr(fn funcTok, args argList[ast.Arg], stmts block[ast.Stmt]) ast.Expr {
-	return ast.NodeAt(fn.start(), ast.Method{
+	return ast.NodeAt(fn.start(), ast.Function{
 		Name: "",
 		Args: args.items,
 		Body: stmts.stmts,
@@ -116,9 +116,17 @@ func (syntax) ParseMemberAccess(object ast.Expr, dot dotTok, id idTok) ast.Expr 
 	})
 }
 
-func (syntax) ParseCall(method ast.Expr, args argList[ast.Expr]) ast.Expr {
+func (syntax) ParseCall(callable ast.Expr, args argList[ast.Expr]) ast.Expr {
 	return ast.NodeAt(args.start, ast.Call{
-		Method: method,
+		Method: callable,
 		Args:   args.items,
+	})
+}
+
+func (syntax) ParseMethod(name idTok, args argList[ast.Arg], body block[ast.Stmt]) ast.Member {
+	return ast.NodeAt(name.start(), ast.Method{
+		Name: name.text(),
+		Args: args.items,
+		Body: body.stmts,
 	})
 }
