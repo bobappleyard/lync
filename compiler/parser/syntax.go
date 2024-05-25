@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"path"
+
 	"github.com/bobappleyard/lync/compiler/ast"
 	"github.com/bobappleyard/lync/util/text"
 )
@@ -18,15 +20,17 @@ type syntax struct {
 
 var parser = text.NewParser[token, ast.Program](syntax{})
 
-func (syntax) ParseProgram(stmts blockList[ast.Stmt]) ast.Program {
+func (syntax) ParseProgram(_ optionalNewline, stmts delimList[ast.Stmt, newlineTok], _ optionalNewline) ast.Program {
 	return ast.Program{
-		Stmts: stmts.stmts,
+		Stmts: stmts.items,
 	}
 }
 
-func (syntax) ParseImport(imp importTok, path stringTok) ast.Stmt {
+func (syntax) ParseImport(imp importTok, importPath stringTok) ast.Stmt {
+	name := path.Base(importPath.value())
 	return ast.NodeAt(imp.start(), ast.Import{
-		Path: path.value(),
+		Name: name,
+		Path: importPath.value(),
 	})
 }
 

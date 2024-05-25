@@ -54,7 +54,7 @@ func (d *ExampleDecoder) Step() (err error) {
 			return err
 		}
 		
-		d.Pos += len(d.Code) - len(b)
+		d.Pos = len(d.Code) - len(b)
 		d.Impl.SetValue(value,)
 	
 	case 1:
@@ -65,7 +65,7 @@ func (d *ExampleDecoder) Step() (err error) {
 			return err
 		}
 		
-		d.Pos += len(d.Code) - len(b)
+		d.Pos = len(d.Code) - len(b)
 		d.Impl.Add(delta,)
 	
 	default:

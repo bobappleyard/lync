@@ -1,6 +1,7 @@
 package model
 
 type Interpreter struct {
+	HostPkg string
 	Imports []Import
 	Opcodes []Opcode
 }

@@ -81,13 +81,32 @@ func (nullableRuleset) ParseNull() intList {
 func TestNullableGrammar(t *testing.T) {
 	toks := []testTok{
 		intTok{1},
-		intTok{2},
-		intTok{3},
 	}
 
 	expr, err := NewParser[testTok, intList](nullableRuleset{}).Parse(toks)
 	assert.Nil(t, err)
-	assert.Equal(t, intList{[]int{1, 2, 3}}, expr)
+	assert.Equal(t, intList{[]int{1}}, expr)
+}
+
+type nullableRightRuleset struct {
+}
+
+func (nullableRightRuleset) ParseInt(val intTok, right intList) intList {
+	return intList{append([]int{val.value}, right.vals...)}
+}
+
+func (nullableRightRuleset) ParseNull() intList {
+	return intList{}
+}
+
+func TestNullableRightGrammar(t *testing.T) {
+	toks := []testTok{
+		intTok{1},
+	}
+
+	expr, err := NewParser[testTok, intList](nullableRightRuleset{}).Parse(toks)
+	assert.Nil(t, err)
+	assert.Equal(t, intList{[]int{1}}, expr)
 }
 
 type sliceRuleset struct {
@@ -169,4 +188,48 @@ func TestReusableParser(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, intList{[]int{1, 2, 3}}, expr)
 
+}
+
+type optional[T any] struct {
+	value *T
+}
+
+type optionalParser[T any] struct {
+}
+
+func (optional[T]) Parser() optionalParser[T] {
+	return optionalParser[T]{}
+}
+
+func (optionalParser[T]) ParseEmpty() optional[T] {
+	return optional[T]{
+		value: nil,
+	}
+}
+
+func (optionalParser[T]) ParseOne(x T) optional[T] {
+	return optional[T]{
+		value: &x,
+	}
+}
+
+type optionalRuleset struct {
+}
+
+func (optionalRuleset) ParseSentence(x intTok, plus optional[plusTok]) intList {
+	if plus.value != nil {
+		return intList{vals: []int{x.value, x.value}}
+	}
+	return intList{vals: []int{x.value}}
+}
+
+func TestOptionalSuffix(t *testing.T) {
+	toks := []testTok{
+		intTok{1},
+	}
+
+	p := NewParser[testTok, intList](optionalRuleset{})
+	expr, err := p.Parse(toks)
+	assert.Nil(t, err)
+	assert.Equal(t, intList{[]int{1}}, expr)
 }

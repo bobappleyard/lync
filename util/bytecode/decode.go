@@ -26,7 +26,7 @@ func (d *{{.DecoderName}}) Step() (err error) {
 			return err
 		}
 		{{end}}
-		d.Pos += len(d.Code) - len(b)
+		d.Pos = len(d.Code) - len(b)
 		{{if .HasError}}err = {{end}}d.Impl.{{.Name}}({{range .Args}}{{.Name}},{{end -}})
 	{{end}}
 	default:

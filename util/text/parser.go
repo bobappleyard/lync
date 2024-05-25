@@ -53,7 +53,7 @@ func (p Parser[T, U]) Parse(toks []T) (U, error) {
 		return zero, err
 	}
 
-	rv, err := m.builder().build(p.root, reflect.ValueOf(p.ruleSet))
+	rv, err := m.builder().build(p.root)
 	if err != nil {
 		return zero, err
 	}
@@ -81,6 +81,9 @@ type rule struct {
 
 	// the parser host
 	host reflect.Value
+
+	// debug: the rule's method name
+	name string
 
 	// index of method into host
 	index int
@@ -125,6 +128,7 @@ func (s *scanner) scanMethods(host reflect.Value) {
 			implements: produces,
 			deps:       deps,
 			host:       host,
+			name:       m.Name,
 			index:      m.Index,
 			method: func(host reflect.Value, args []reflect.Value) []reflect.Value {
 				return m.Func.Call(args)
@@ -209,6 +213,7 @@ func (s *scanner) fillOutInterface(itfs *[]reflect.Type, todo reflect.Type) {
 				implements: sym,
 				deps:       r.deps,
 				host:       r.host,
+				name:       r.name,
 				index:      r.index,
 				method:     r.method,
 			})
@@ -254,6 +259,7 @@ func (s *scanner) sliceTypeSymbol(sliceSym *symbol, slice reflect.Type) {
 		implements: sliceSym,
 		deps:       []*symbol{},
 		host:       s.host,
+		name:       fmt.Sprintf("[]%s(nil)", elem),
 		index:      -1,
 		method: func(host reflect.Value, args []reflect.Value) []reflect.Value {
 			res := reflect.MakeSlice(slice, 0, 0)
@@ -264,6 +270,7 @@ func (s *scanner) sliceTypeSymbol(sliceSym *symbol, slice reflect.Type) {
 		implements: sliceSym,
 		deps:       []*symbol{sliceSym, elemSym},
 		host:       s.host,
+		name:       fmt.Sprintf("[]%s(append)", elem),
 		index:      -1,
 		method: func(host reflect.Value, args []reflect.Value) []reflect.Value {
 			res := reflect.Append(args[1], args[2])
@@ -279,8 +286,13 @@ type matcher struct {
 }
 
 type item struct {
-	rule     *rule
+	// the rule that this item is matching
+	rule *rule
+
+	// where in the input this item begins
 	position int
+
+	// how far through the rule this item has progressed
 	progress int
 }
 
@@ -328,6 +340,7 @@ func (p *matcher) finalStep() {
 		}
 		if next.nullable {
 			p.advance(item)
+			p.predict(next)
 		}
 	}
 }
@@ -404,6 +417,11 @@ func (p *matcher) addTo(pos int, x item) {
 	p.state[pos] = append(p.state[pos], x)
 }
 
+func (x item) complete() bool {
+	_, ok := x.nextSymbol()
+	return !ok
+}
+
 func (x item) nextSymbol() (*symbol, bool) {
 	if x.progress == len(x.rule.deps) {
 		return nil, false
@@ -460,7 +478,7 @@ func (p *matcher) flipState() [][]item {
 	flipped := make([][]item, len(p.state))
 	for i, set := range p.state {
 		for _, x := range set {
-			if _, ok := x.nextSymbol(); ok {
+			if !x.complete() {
 				continue
 			}
 			flipped[x.position] = append(flipped[x.position], item{
@@ -473,7 +491,7 @@ func (p *matcher) flipState() [][]item {
 	return flipped
 }
 
-func (b *builder) build(root *symbol, host reflect.Value) (reflect.Value, error) {
+func (b *builder) build(root *symbol) (reflect.Value, error) {
 	for _, top := range b.state[0] {
 		if top.rule.implements != root {
 			continue
@@ -485,7 +503,7 @@ func (b *builder) build(root *symbol, host reflect.Value) (reflect.Value, error)
 		if !ok {
 			return reflect.Value{}, ErrFailedMatch
 		}
-		return b.buildFromSpan(host, span)
+		return b.buildFromSpan(span)
 	}
 	return reflect.Value{}, ErrFailedMatch
 }
@@ -502,7 +520,7 @@ func (b *builder) findSpan(x item, at int) (span, bool) {
 	}, true
 }
 
-func (b *builder) buildFromSpan(host reflect.Value, s span) (reflect.Value, error) {
+func (b *builder) buildFromSpan(s span) (reflect.Value, error) {
 	if s.value.IsValid() {
 		return s.value, nil
 	}
@@ -510,7 +528,7 @@ func (b *builder) buildFromSpan(host reflect.Value, s span) (reflect.Value, erro
 	args := make([]reflect.Value, len(s.children)+1)
 	args[0] = r.host
 	for i, c := range s.children {
-		child, err := b.buildFromSpan(host, c)
+		child, err := b.buildFromSpan(c)
 		if err != nil {
 			return reflect.Value{}, err
 		}

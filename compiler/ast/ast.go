@@ -37,6 +37,16 @@ type FltConstant struct {
 	Value float64
 }
 
+type Unit struct {
+	astNodeData
+}
+
+type Name struct {
+	astNodeData
+
+	Name string
+}
+
 type VariableRef struct {
 	astNodeData
 
@@ -78,6 +88,8 @@ type Arg struct {
 	Name string
 }
 
+func (Unit) expr()           {}
+func (Name) expr()           {}
 func (StringConstant) expr() {}
 func (IntConstant) expr()    {}
 func (FltConstant) expr()    {}
@@ -132,10 +144,6 @@ type Import struct {
 	Path string
 }
 
-type NoOp struct {
-	astNodeData
-}
-
 type If struct {
 	astNodeData
 
@@ -147,9 +155,10 @@ type If struct {
 func (Return) stmt()   {}
 func (Variable) stmt() {}
 func (Import) stmt()   {}
-func (NoOp) stmt()     {}
 func (If) stmt()       {}
 
+func (Unit) stmt()           {}
+func (Name) stmt()           {}
 func (StringConstant) stmt() {}
 func (IntConstant) stmt()    {}
 func (FltConstant) stmt()    {}

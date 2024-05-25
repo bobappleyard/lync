@@ -29,7 +29,7 @@ func main() {
 		return
 	}
 
-	interp := parseInterpreter(typ.(*types.TypeName).Type().(*types.Named))
+	interp := parseInterpreter(pkg.Path(), typ.(*types.TypeName).Type().(*types.Named))
 	formatPkg := packageName(&interp, loadPackage("github.com/bobappleyard/lync/util/format"))
 
 	f, err := os.Create(*out)
@@ -77,8 +77,20 @@ func loadPackage(name string) *types.Package {
 	return pkgs[0].Types
 }
 
-func parseInterpreter(typ *types.Named) model.Interpreter {
-	var interp model.Interpreter
+type withMethods interface {
+	NumMethods() int
+	Method(i int) *types.Func
+	Underlying() types.Type
+}
+
+func parseInterpreter(pkg string, typ withMethods) model.Interpreter {
+	interp := model.Interpreter{
+		HostPkg: pkg,
+	}
+
+	if t, ok := typ.Underlying().(*types.Interface); ok {
+		typ = t
+	}
 	for i := 0; i < typ.NumMethods(); i++ {
 		m := typ.Method(i)
 		if !m.Exported() {
@@ -113,6 +125,10 @@ func parseInterpreter(typ *types.Named) model.Interpreter {
 }
 
 func packageName(interp *model.Interpreter, pkg *types.Package) string {
+	if pkg.Path() == interp.HostPkg {
+		return ""
+	}
+
 	idx, ok := slices.BinarySearchFunc(
 		interp.Imports,
 		pkg.Path(),

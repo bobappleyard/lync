@@ -16,11 +16,17 @@ func TestSyntax(t *testing.T) {
 		out  ast.Program
 	}{
 		{
+			name: "Empty",
+			in:   ``,
+			out:  ast.Program{},
+		},
+		{
 			name: "Import",
 			in:   `import "path"`,
 			out: ast.Program{
 				Stmts: []ast.Stmt{
 					ast.Import{
+						Name: "path",
 						Path: "path",
 					},
 				},
@@ -33,6 +39,7 @@ func TestSyntax(t *testing.T) {
 			out: ast.Program{
 				Stmts: []ast.Stmt{
 					ast.Import{
+						Name: "path",
 						Path: "path",
 					},
 				},
@@ -45,21 +52,27 @@ func TestSyntax(t *testing.T) {
 			import "path"`,
 			out: ast.Program{
 				Stmts: []ast.Stmt{
-					ast.Import{Path: "path"},
-					ast.Import{Path: "path"},
+					ast.Import{
+						Name: "path",
+						Path: "path",
+					},
+					ast.Import{
+						Name: "path",
+						Path: "path",
+					},
 				},
 			},
 		},
 		{
-			name: "ImportTwiceNewline",
+			name: "ImportNested",
 			in: `
-			import "path"
-			import "path"
-			`,
+			import "path/of"`,
 			out: ast.Program{
 				Stmts: []ast.Stmt{
-					ast.Import{Path: "path"},
-					ast.Import{Path: "path"},
+					ast.Import{
+						Name: "of",
+						Path: "path/of",
+					},
 				},
 			},
 		},
@@ -348,7 +361,10 @@ func TestSyntax(t *testing.T) {
 			`,
 			out: ast.Program{
 				Stmts: []ast.Stmt{
-					ast.Import{Path: "array"},
+					ast.Import{
+						Name: "array",
+						Path: "array",
+					},
 					ast.Function{
 						Name: "loop",
 						Args: []ast.Arg{{Name: "f"}},
