@@ -124,6 +124,14 @@ type Stmt interface {
 	Node
 }
 
+type Assign struct {
+	astNodeData
+
+	Object Expr
+	Name   string
+	Value  Expr
+}
+
 type Return struct {
 	astNodeData
 
@@ -152,6 +160,7 @@ type If struct {
 	Else []Stmt
 }
 
+func (Assign) stmt()   {}
 func (Return) stmt()   {}
 func (Variable) stmt() {}
 func (Import) stmt()   {}
