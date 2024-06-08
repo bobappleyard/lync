@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/bobappleyard/lync/util/queue"
+	"github.com/bobappleyard/lync/util/data"
 )
 
 type UnexpectedToken struct {
@@ -147,7 +147,7 @@ func (s *scanner) markTokenTypes() {
 }
 
 func (s *scanner) markNullableTypes() {
-	var needsWork queue.Queue[*symbol]
+	var needsWork data.Queue[*symbol]
 	symUsers := map[*symbol][]*rule{}
 
 	for _, sym := range s.types {

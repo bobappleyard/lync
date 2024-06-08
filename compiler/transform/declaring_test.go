@@ -31,7 +31,7 @@ func TestDeclarators(t *testing.T) {
 						Value: ast.Call{
 							Method: ast.MemberAccess{
 								Object: ast.Unit{},
-								Member: "import_pkg",
+								Member: "import_package",
 							},
 							Args: []ast.Expr{
 								ast.StringConstant{Value: "os"},
@@ -107,7 +107,7 @@ func TestDeclarators(t *testing.T) {
 								ast.Variable{Name: "x", Value: ast.Call{
 									Method: ast.MemberAccess{
 										Object: ast.Unit{},
-										Member: "import_pkg",
+										Member: "import_package",
 									},
 									Args: []ast.Expr{
 										ast.StringConstant{Value: "woop"},

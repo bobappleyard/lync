@@ -1,4 +1,4 @@
-package sparse
+package data
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestMatrix_AddRow(t *testing.T) {
-	var m Matrix[int]
+	var m SparseMatrix[int]
 
 	assertLookup := func(row, col, expect int) {
 		t.Helper()
@@ -16,23 +16,23 @@ func TestMatrix_AddRow(t *testing.T) {
 		assert.Equal(t, x, expect)
 	}
 
-	m.AddRow([]Element[int]{{0, 0}, {1, 10}, {3, 30}})
-	m.AddRow([]Element[int]{{0, 0}, {2, 10}, {3, 30}})
-	m.AddRow([]Element[int]{{5, 50}, {4, 40}, {9, 60}})
-	m.AddRow([]Element[int]{{0, 0}})
+	m.AddRow([]SparseMatrixElement[int]{{0, 0}, {1, 10}, {3, 30}})
+	m.AddRow([]SparseMatrixElement[int]{{0, 0}, {2, 10}, {3, 30}})
+	m.AddRow([]SparseMatrixElement[int]{{5, 50}, {4, 40}, {9, 60}})
+	m.AddRow([]SparseMatrixElement[int]{{0, 0}})
 
 	assertLookup(0, 1, 10)
 	assertLookup(1, 2, 10)
 	assertLookup(0, 3, 30)
 
-	assert.Equal(t, m.LookupRow(0), []Element[int]{{0, 0}, {1, 10}, {3, 30}})
-	assert.Equal(t, m.LookupRow(2), []Element[int]{{5, 50}, {4, 40}, {9, 60}})
+	assert.Equal(t, m.LookupRow(0), []SparseMatrixElement[int]{{0, 0}, {1, 10}, {3, 30}})
+	assert.Equal(t, m.LookupRow(2), []SparseMatrixElement[int]{{5, 50}, {4, 40}, {9, 60}})
 
 	t.Log(m)
 }
 
 func TestMatrix_LookupValue(t *testing.T) {
-	m := Matrix[string]{
+	m := SparseMatrix[string]{
 		entries: []matrixEntry[string]{{value: "hello"}},
 		rows:    []matrixRow{{}},
 	}
@@ -53,7 +53,7 @@ func TestMatrix_LookupValue(t *testing.T) {
 }
 
 func TestMatrix_LookupRow(t *testing.T) {
-	m := Matrix[string]{
+	m := SparseMatrix[string]{
 		entries: []matrixEntry[string]{
 			{value: "hello", row: 0, next: -1},
 			{},
@@ -66,8 +66,8 @@ func TestMatrix_LookupRow(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, m.LookupRow(0), []Element[string]{{Col: 0, Value: "hello"}})
-	assert.Equal(t, m.LookupRow(1), []Element[string]{{Col: 2, Value: "say"}, {Col: 1, Value: "goodbye"}})
+	assert.Equal(t, m.LookupRow(0), []SparseMatrixElement[string]{{Col: 0, Value: "hello"}})
+	assert.Equal(t, m.LookupRow(1), []SparseMatrixElement[string]{{Col: 2, Value: "say"}, {Col: 1, Value: "goodbye"}})
 	assert.Equal(t, m.LookupRow(-1), nil)
 	assert.Equal(t, m.LookupRow(2), nil)
 }

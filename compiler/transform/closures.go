@@ -1,13 +1,14 @@
 package transform
 
 import (
-	"slices"
-
 	"github.com/bobappleyard/lync/compiler/ast"
+	"github.com/bobappleyard/lync/util/data"
 )
 
+// assumes boxes have been handled
 func transformClosures(p ast.Program) ast.Program {
-	var c closures
+	c := new(closures)
+	c.fallbackTransformer = fallbackTransformer{c}
 
 	return ast.Program{
 		Stmts: c.transformBlock(p.Stmts),
@@ -15,99 +16,67 @@ func transformClosures(p ast.Program) ast.Program {
 }
 
 type closures struct {
-	captured vars
+	fallbackTransformer
+	captured *data.Set[string]
 }
 
 func (c *closures) transformBlock(stmts []ast.Stmt) []ast.Stmt {
-	inner := &closures{c.blockScope(c.captured, stmts)}
+	inner := &closures{captured: c.blockScope(c.captured, stmts)}
+	inner.fallbackTransformer = fallbackTransformer{inner}
 	return mapSlice(stmts, inner.transformStmt)
-}
-
-func (c *closures) transformStmt(s ast.Stmt) ast.Stmt {
-	switch s := s.(type) {
-	case ast.Expr:
-		return c.transformExpr(s)
-
-	case ast.Return:
-		return ast.NodeAt(s.Start(), ast.Return{
-			Value: c.transformExpr(s.Value),
-		})
-
-	case ast.Variable:
-		return ast.NodeAt(s.Start(), ast.Variable{
-			Name:  s.Name,
-			Value: c.transformExpr(s.Value),
-		})
-
-	case ast.If:
-		return ast.NodeAt(s.Start(), ast.If{
-			Cond: c.transformExpr(s.Cond),
-			Then: c.transformBlock(s.Then),
-			Else: c.transformBlock(s.Else),
-		})
-
-	default:
-		return s
-	}
 }
 
 func (c *closures) transformExpr(e ast.Expr) ast.Expr {
 	switch e := e.(type) {
-	case ast.MemberAccess:
-		return ast.NodeAt(e.Start(), ast.MemberAccess{
-			Object: c.transformExpr(e.Object),
-			Member: e.Member,
-		})
-
-	case ast.Call:
-		return ast.NodeAt(e.Start(), ast.Call{
-			Method: c.transformExpr(e.Method),
-			Args:   mapSlice(e.Args, c.transformExpr),
-		})
 
 	case ast.Function:
 		return c.createClosure(e, c.capturedVariables(e))
 
 	default:
-		return e
+		return c.fallbackTransformer.transformExpr(e)
 	}
 }
 
-func (c *closures) capturedVariables(f ast.Function) vars {
-	locals := mapSlice(f.Args, argName)
+func (c *closures) capturedVariables(f ast.Function) *data.Set[string] {
+	locals := newVarSet()
+	for _, x := range f.Args {
+		locals.Add(x.Name)
+	}
 	return c.capturedInBlock(locals, f.Body)
 }
 
-func (c *closures) capturedInBlock(locals vars, ss []ast.Stmt) vars {
+func (c *closures) capturedInBlock(locals *data.Set[string], ss []ast.Stmt) *data.Set[string] {
 	inner := c.blockScope(locals, ss)
-	var captured vars
+	captured := newVarSet()
 	for _, s := range ss {
-		captured.addAll(c.capturedInStmt(inner, s))
+		captured.AddSet(c.capturedInStmt(inner, s))
 	}
 	return captured
 }
 
-func (c *closures) capturedInStmt(locals vars, s ast.Stmt) vars {
-	var captured vars
+func (c *closures) capturedInStmt(locals *data.Set[string], s ast.Stmt) *data.Set[string] {
+	captured := newVarSet()
 	switch s := s.(type) {
 	case ast.VariableRef:
-		if c.captured.contains(s.Var) && !locals.contains(s.Var) {
-			captured.add(s.Var)
+		if c.captured.Contains(s.Var) && !locals.Contains(s.Var) {
+			captured.Add(s.Var)
 		}
 
 	case ast.MemberAccess:
 		captured = c.capturedInStmt(locals, s.Object)
 
 	case ast.Call:
-		captured.addAll(c.capturedInStmt(locals, s.Method))
+		captured.AddSet(c.capturedInStmt(locals, s.Method))
 		for _, x := range s.Args {
-			captured.addAll(c.capturedInStmt(locals, x))
+			captured.AddSet(c.capturedInStmt(locals, x))
 		}
 
 	case ast.Function:
-		var inner vars
-		inner.addAll(locals)
-		inner.addAll(mapSlice(s.Args, argName))
+		inner := newVarSet()
+		inner.AddSet(locals)
+		for _, a := range s.Args {
+			inner.Add(a.Name)
+		}
 		return c.capturedInBlock(inner, s.Body)
 
 	case ast.Return:
@@ -117,9 +86,9 @@ func (c *closures) capturedInStmt(locals vars, s ast.Stmt) vars {
 		captured = c.capturedInStmt(locals, s.Value)
 
 	case ast.If:
-		captured.addAll(c.capturedInStmt(locals, s.Cond))
-		captured.addAll(c.capturedInBlock(locals, s.Then))
-		captured.addAll(c.capturedInBlock(locals, s.Else))
+		captured.AddSet(c.capturedInStmt(locals, s.Cond))
+		captured.AddSet(c.capturedInBlock(locals, s.Then))
+		captured.AddSet(c.capturedInBlock(locals, s.Else))
 
 	default:
 		return nil
@@ -128,29 +97,28 @@ func (c *closures) capturedInStmt(locals vars, s ast.Stmt) vars {
 	return captured
 }
 
-func (c *closures) blockScope(base vars, ss []ast.Stmt) vars {
-	inner := base.clone()
-	for _, s := range ss {
-		if s, ok := s.(ast.Variable); ok {
-			inner.add(s.Name)
-		}
-	}
+func (c *closures) blockScope(base *data.Set[string], ss []ast.Stmt) *data.Set[string] {
+	inner := newVarSet()
+	inner.AddSet(base)
+	inner.AddSet(blockVars(ss))
 	return inner
 }
 
-func (c *closures) createClosure(f ast.Function, closure []string) ast.Expr {
-	inner := closures{captured: append(mapSlice(f.Args, argName), closure...)}
-	slices.Sort(inner.captured)
+func (c *closures) createClosure(f ast.Function, closure *data.Set[string]) ast.Expr {
+	captured := newVarSet()
+	for _, a := range f.Args {
+		captured.Add(a.Name)
+	}
+	captured.AddSet(closure)
+	inner := &closures{captured: captured}
+	inner.fallbackTransformer = fallbackTransformer{inner}
 
-	capturedArgs := mapSlice(closure, func(name string) ast.Arg {
-		return ast.Arg{Name: name}
-	})
 	lifted := ast.Function{
 		Name: f.Name,
-		Args: append(capturedArgs, f.Args...),
+		Args: append(mapSlice(closure.Items(), namedArg), f.Args...),
 		Body: inner.transformBlock(f.Body),
 	}
-	if len(closure) == 0 {
+	if closure.Empty() {
 		return lifted
 	}
 
@@ -159,20 +127,8 @@ func (c *closures) createClosure(f ast.Function, closure []string) ast.Expr {
 			Object: ast.Unit{},
 			Member: "create_closure",
 		},
-		Args: append([]ast.Expr{lifted}, mapSlice(closure, func(name string) ast.Expr {
+		Args: append([]ast.Expr{lifted}, mapSlice(closure.Items(), func(name string) ast.Expr {
 			return ast.VariableRef{Var: name}
 		})...),
 	})
-}
-
-func mapSlice[T, U any](xs []T, f func(T) U) []U {
-	res := make([]U, len(xs))
-	for i, x := range xs {
-		res[i] = f(x)
-	}
-	return res
-}
-
-func argName(x ast.Arg) string {
-	return x.Name
 }

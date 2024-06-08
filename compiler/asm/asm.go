@@ -7,7 +7,7 @@ import (
 
 	"github.com/bobappleyard/lync"
 	"github.com/bobappleyard/lync/compiler/ast"
-	"github.com/bobappleyard/lync/util/queue"
+	"github.com/bobappleyard/lync/util/data"
 )
 
 var (
@@ -31,7 +31,7 @@ func AssembleProgram(p ast.Program) (lync.Unit, error) {
 type assembler struct {
 	err     error
 	enc     lync.BytecodeEncoder
-	pending queue.Queue[block]
+	pending data.Queue[block]
 	methods []string
 }
 

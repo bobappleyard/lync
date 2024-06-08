@@ -1,13 +1,13 @@
-package sparse
+package data
 
 import "math"
 
-type Matrix[T any] struct {
+type SparseMatrix[T any] struct {
 	entries []matrixEntry[T]
 	rows    []matrixRow
 }
 
-type Element[T any] struct {
+type SparseMatrixElement[T any] struct {
 	Col   int
 	Value T
 }
@@ -24,7 +24,7 @@ type matrixRow struct {
 	start  int
 }
 
-func (m *Matrix[T]) AddRow(elements []Element[T]) int {
+func (m *SparseMatrix[T]) AddRow(elements []SparseMatrixElement[T]) int {
 	start, end := rowBounds(elements)
 	row := len(m.rows)
 
@@ -40,7 +40,7 @@ func (m *Matrix[T]) AddRow(elements []Element[T]) int {
 	return row
 }
 
-func (m *Matrix[T]) LookupValue(row, col int) (T, bool) {
+func (m *SparseMatrix[T]) LookupValue(row, col int) (T, bool) {
 	var zero T
 
 	if row < 0 || row >= len(m.rows) {
@@ -55,8 +55,8 @@ func (m *Matrix[T]) LookupValue(row, col int) (T, bool) {
 	return m.entries[pos].value, true
 }
 
-func (m *Matrix[T]) LookupRow(row int) []Element[T] {
-	var res []Element[T]
+func (m *SparseMatrix[T]) LookupRow(row int) []SparseMatrixElement[T] {
+	var res []SparseMatrixElement[T]
 
 	if row < 0 || row >= len(m.rows) {
 		return res
@@ -65,7 +65,7 @@ func (m *Matrix[T]) LookupRow(row int) []Element[T] {
 	info := m.rows[row]
 
 	for cur := info.start; cur != -1; cur = m.entries[info.offset+cur].next {
-		res = append(res, Element[T]{
+		res = append(res, SparseMatrixElement[T]{
 			Col:   cur,
 			Value: m.entries[info.offset+cur].value,
 		})
@@ -74,7 +74,7 @@ func (m *Matrix[T]) LookupRow(row int) []Element[T] {
 	return res
 }
 
-func rowBounds[T any](elements []Element[T]) (start, end int) {
+func rowBounds[T any](elements []SparseMatrixElement[T]) (start, end int) {
 	start = math.MaxInt
 	for _, e := range elements {
 		start = min(start, e.Col)
@@ -83,7 +83,7 @@ func rowBounds[T any](elements []Element[T]) (start, end int) {
 	return start, end
 }
 
-func (m *Matrix[T]) findOffset(elements []Element[T], start int) int {
+func (m *SparseMatrix[T]) findOffset(elements []SparseMatrixElement[T], start int) int {
 	offset := -start
 
 	for {
@@ -106,7 +106,7 @@ func (m *Matrix[T]) findOffset(elements []Element[T], start int) int {
 	return offset
 }
 
-func (m *Matrix[T]) ensureEntries(n int) {
+func (m *SparseMatrix[T]) ensureEntries(n int) {
 	if n <= len(m.entries) {
 		return
 	}
@@ -122,7 +122,7 @@ func (m *Matrix[T]) ensureEntries(n int) {
 	m.entries = append(m.entries, toAdd...)
 }
 
-func (m *Matrix[T]) insertEntries(elements []Element[T], row, offset int) {
+func (m *SparseMatrix[T]) insertEntries(elements []SparseMatrixElement[T], row, offset int) {
 	for i := len(elements) - 1; i >= 0; i-- {
 		e := elements[i]
 

@@ -13,7 +13,7 @@ func Equal[T any](t testing.TB, got, expected T) {
 	if !reflect.DeepEqual(got, expected) {
 		cl, err := diff.Diff(expected, got)
 		if err != nil {
-			panic(err)
+			t.Error(err)
 		}
 		if cl != nil {
 			sb, err := json.MarshalIndent(cl, "", "\t")
