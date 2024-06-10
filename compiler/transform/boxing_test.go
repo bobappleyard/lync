@@ -304,7 +304,7 @@ func TestBoxing(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			out := introduceBoxing(test.in)
+			out := transformBoxing(test.in)
 			assert.Equal(t, out, test.out)
 			if t.Failed() {
 				ast2.Print(nil, out)

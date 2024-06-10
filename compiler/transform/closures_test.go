@@ -242,6 +242,47 @@ func TestClosures(t *testing.T) {
 				},
 			}},
 		},
+		{
+			name: "ClosureArg",
+			in: ast.Program{Stmts: []ast.Stmt{
+				ast.Function{Body: []ast.Stmt{
+					ast.Variable{Name: "x", Value: ast.IntConstant{Value: 2}},
+					ast.Call{
+						Method: ast.VariableRef{Var: "f"},
+						Args: []ast.Expr{
+							ast.Function{Body: []ast.Stmt{
+								ast.VariableRef{Var: "x"},
+							}},
+						},
+					},
+				}},
+			}},
+			out: ast.Program{Stmts: []ast.Stmt{
+				ast.Function{Body: []ast.Stmt{
+					ast.Variable{Name: "x", Value: ast.IntConstant{Value: 2}},
+					ast.Call{
+						Method: ast.VariableRef{Var: "f"},
+						Args: []ast.Expr{
+							ast.Call{
+								Method: ast.MemberAccess{
+									Object: ast.Unit{},
+									Member: "create_closure",
+								},
+								Args: []ast.Expr{
+									ast.Function{
+										Args: []ast.Arg{{Name: "x"}},
+										Body: []ast.Stmt{
+											ast.VariableRef{Var: "x"},
+										},
+									},
+									ast.VariableRef{Var: "x"},
+								},
+							},
+						},
+					},
+				}},
+			}},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			out := transformClosures(test.in)

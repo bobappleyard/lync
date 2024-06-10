@@ -5,7 +5,7 @@ import (
 	"github.com/bobappleyard/lync/util/data"
 )
 
-func introduceBoxing(p ast.Program) ast.Program {
+func transformBoxing(p ast.Program) ast.Program {
 	boxes := &boxing{boxed: newVarSet()}
 	boxes.fallbackTransformer = fallbackTransformer{boxes}
 	return ast.Program{
@@ -19,27 +19,19 @@ type boxing struct {
 	args  *data.Set[string]
 }
 
-type boxScopeTracking struct {
-	locals   *data.Set[string]
-	referred *data.Set[string]
-	captured *data.Set[string]
-	boxed    *data.Set[string]
+type boxScopeAnalyzer struct {
+	fallbackAnalyzer
+	inClosure bool
+	locals    *data.Set[string]
+	referred  *data.Set[string]
+	captured  *data.Set[string]
+	boxed     *data.Set[string]
 }
 
 func (b *boxing) transformBlock(stmts []ast.Stmt) []ast.Stmt {
 	needBoxes := b.needBoxes(stmts)
-	res := mapSlice(needBoxes.Items(), func(v string) ast.Stmt {
-		var value ast.Expr
-		if b.args.Contains(v) {
-			value = b.call("", "create_box", ast.VariableRef{Var: v})
-		} else {
-			value = b.call("", "create_undefined_box", ast.Name{Name: v})
-		}
-		return ast.Variable{Name: v, Value: value}
-	})
-	for _, b := range b.boxed.Items() {
-		needBoxes.Add(b)
-	}
+	res := mapSlice(needBoxes.Items(), b.createBox)
+	needBoxes.AddSet(b.boxed)
 	inner := &boxing{
 		boxed: needBoxes,
 	}
@@ -104,17 +96,28 @@ func (b *boxing) transformExpr(expr ast.Expr) ast.Expr {
 }
 
 func (b *boxing) needBoxes(stmts []ast.Stmt) *data.Set[string] {
-	tracking := boxScopeTracking{
+	tracking := &boxScopeAnalyzer{
 		referred: newVarSet(),
 		captured: newVarSet(),
 		boxed:    newVarSet(),
 	}
+	tracking.fallbackAnalyzer = fallbackAnalyzer{tracking}
 
 	for _, stmt := range stmts {
-		tracking.analyzeStmt(stmt, false)
+		tracking.analyzeStmt(stmt)
 	}
 
 	return tracking.boxed
+}
+
+func (b *boxing) createBox(v string) ast.Stmt {
+	var value ast.Expr
+	if b.args.Contains(v) {
+		value = b.call("", "create_box", ast.VariableRef{Var: v})
+	} else {
+		value = b.call("", "create_undefined_box", ast.Name{Name: v})
+	}
+	return ast.Variable{Name: v, Value: value}
 }
 
 func (b *boxing) call(varName, methodName string, args ...ast.Expr) ast.Expr {
@@ -131,7 +134,7 @@ func (b *boxing) call(varName, methodName string, args ...ast.Expr) ast.Expr {
 	}
 }
 
-func (t boxScopeTracking) analyzeStmt(stmt ast.Stmt, inClosure bool) {
+func (t *boxScopeAnalyzer) analyzeStmt(stmt ast.Stmt) {
 	switch stmt := stmt.(type) {
 
 	case ast.VariableRef:
@@ -139,12 +142,12 @@ func (t boxScopeTracking) analyzeStmt(stmt ast.Stmt, inClosure bool) {
 			return
 		}
 		t.referred.Add(stmt.Var)
-		if inClosure {
+		if t.inClosure {
 			t.captured.Add(stmt.Var)
 		}
 
 	case ast.Variable:
-		t.analyzeStmt(stmt.Value, inClosure)
+		t.analyzeStmt(stmt.Value)
 
 		if t.locals.Contains(stmt.Name) {
 			return
@@ -154,13 +157,13 @@ func (t boxScopeTracking) analyzeStmt(stmt ast.Stmt, inClosure bool) {
 		}
 
 	case ast.Assign:
-		t.analyzeStmt(stmt.Object, inClosure)
-		t.analyzeStmt(stmt.Value, inClosure)
+		t.analyzeStmt(stmt.Object)
+		t.analyzeStmt(stmt.Value)
 
 		if stmt.Object != nil || t.locals.Contains(stmt.Name) {
 			return
 		}
-		if inClosure || t.captured.Contains(stmt.Name) {
+		if t.inClosure || t.captured.Contains(stmt.Name) {
 			t.boxed.Add(stmt.Name)
 		}
 
@@ -169,41 +172,33 @@ func (t boxScopeTracking) analyzeStmt(stmt ast.Stmt, inClosure bool) {
 		locals.AddSet(t.locals)
 		locals.AddSlice(mapSlice(stmt.Args, argName))
 
-		inner := boxScopeTracking{
-			locals:   locals,
-			referred: t.referred,
-			captured: t.captured,
-			boxed:    t.boxed,
+		inner := boxScopeAnalyzer{
+			inClosure: true,
+			locals:    locals,
+			referred:  t.referred,
+			captured:  t.captured,
+			boxed:     t.boxed,
 		}
-		inner.analyzeBlock(stmt.Body, true)
+		inner.analyzeBlock(stmt.Body)
 
-	case ast.If:
-		t.analyzeStmt(stmt.Cond, inClosure)
-		t.analyzeBlock(stmt.Then, inClosure)
-		t.analyzeBlock(stmt.Else, inClosure)
-
-	case ast.Call:
-		t.analyzeStmt(stmt.Method, inClosure)
-		for _, a := range stmt.Args {
-			t.analyzeStmt(a, inClosure)
-		}
-
-	case ast.MemberAccess:
-		t.analyzeStmt(stmt.Object, inClosure)
+	default:
+		t.fallbackAnalyzer.analyzeStmt(stmt)
 	}
 }
 
-func (t boxScopeTracking) analyzeBlock(stmts []ast.Stmt, inClosure bool) {
+func (t *boxScopeAnalyzer) analyzeBlock(stmts []ast.Stmt) {
 	locals := newVarSet()
 	locals.AddSet(t.locals)
 	locals.AddSet(blockVars(stmts))
-	inner := boxScopeTracking{
-		locals:   locals,
-		referred: t.referred,
-		captured: t.captured,
-		boxed:    t.boxed,
+	inner := &boxScopeAnalyzer{
+		inClosure: t.inClosure,
+		locals:    locals,
+		referred:  t.referred,
+		captured:  t.captured,
+		boxed:     t.boxed,
 	}
+	inner.fallbackAnalyzer = fallbackAnalyzer{inner}
 	for _, stmt := range stmts {
-		inner.analyzeStmt(stmt, inClosure)
+		inner.analyzeStmt(stmt)
 	}
 }

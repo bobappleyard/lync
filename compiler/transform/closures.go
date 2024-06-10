@@ -20,6 +20,13 @@ type closures struct {
 	captured *data.Set[string]
 }
 
+type captureAnalyzer struct {
+	fallbackAnalyzer
+	inScope  *data.Set[string]
+	locals   *data.Set[string]
+	captured *data.Set[string]
+}
+
 func (c *closures) transformBlock(stmts []ast.Stmt) []ast.Stmt {
 	inner := &closures{captured: c.blockScope(c.captured, stmts)}
 	inner.fallbackTransformer = fallbackTransformer{inner}
@@ -39,62 +46,57 @@ func (c *closures) transformExpr(e ast.Expr) ast.Expr {
 
 func (c *closures) capturedVariables(f ast.Function) *data.Set[string] {
 	locals := newVarSet()
-	for _, x := range f.Args {
-		locals.Add(x.Name)
+	locals.AddSlice(mapSlice(f.Args, argName))
+	analyzer := &captureAnalyzer{
+		inScope:  c.captured,
+		locals:   locals,
+		captured: newVarSet(),
 	}
-	return c.capturedInBlock(locals, f.Body)
+	analyzer.fallbackAnalyzer = fallbackAnalyzer{analyzer}
+	analyzer.analyzeBlock(f.Body)
+	return analyzer.captured
 }
 
-func (c *closures) capturedInBlock(locals *data.Set[string], ss []ast.Stmt) *data.Set[string] {
-	inner := c.blockScope(locals, ss)
-	captured := newVarSet()
-	for _, s := range ss {
-		captured.AddSet(c.capturedInStmt(inner, s))
+func (c *captureAnalyzer) withLocals(locals *data.Set[string]) *captureAnalyzer {
+	inner := &captureAnalyzer{
+		inScope:  c.inScope,
+		locals:   locals,
+		captured: c.captured,
 	}
-	return captured
+	inner.fallbackAnalyzer = fallbackAnalyzer{inner}
+	return inner
 }
 
-func (c *closures) capturedInStmt(locals *data.Set[string], s ast.Stmt) *data.Set[string] {
-	captured := newVarSet()
-	switch s := s.(type) {
+func (c *captureAnalyzer) analyzeBlock(stmts []ast.Stmt) {
+	locals := newVarSet()
+	locals.AddSet(c.locals)
+	locals.AddSet(blockVars(stmts))
+
+	inner := c.withLocals(locals)
+	for _, s := range stmts {
+		inner.analyzeStmt(s)
+	}
+}
+
+func (c *captureAnalyzer) analyzeExpr(e ast.Expr) {
+	switch s := e.(type) {
 	case ast.VariableRef:
-		if c.captured.Contains(s.Var) && !locals.Contains(s.Var) {
-			captured.Add(s.Var)
-		}
-
-	case ast.MemberAccess:
-		captured = c.capturedInStmt(locals, s.Object)
-
-	case ast.Call:
-		captured.AddSet(c.capturedInStmt(locals, s.Method))
-		for _, x := range s.Args {
-			captured.AddSet(c.capturedInStmt(locals, x))
+		if c.inScope.Contains(s.Var) && !c.locals.Contains(s.Var) {
+			c.captured.Add(s.Var)
 		}
 
 	case ast.Function:
-		inner := newVarSet()
-		inner.AddSet(locals)
+		locals := newVarSet()
+		locals.AddSet(c.locals)
 		for _, a := range s.Args {
-			inner.Add(a.Name)
+			locals.Add(a.Name)
 		}
-		return c.capturedInBlock(inner, s.Body)
-
-	case ast.Return:
-		captured = c.capturedInStmt(locals, s.Value)
-
-	case ast.Variable:
-		captured = c.capturedInStmt(locals, s.Value)
-
-	case ast.If:
-		captured.AddSet(c.capturedInStmt(locals, s.Cond))
-		captured.AddSet(c.capturedInBlock(locals, s.Then))
-		captured.AddSet(c.capturedInBlock(locals, s.Else))
+		inner := c.withLocals(locals)
+		inner.analyzeBlock(s.Body)
 
 	default:
-		return nil
+		c.fallbackAnalyzer.analyzeExpr(e)
 	}
-
-	return captured
 }
 
 func (c *closures) blockScope(base *data.Set[string], ss []ast.Stmt) *data.Set[string] {
@@ -106,9 +108,7 @@ func (c *closures) blockScope(base *data.Set[string], ss []ast.Stmt) *data.Set[s
 
 func (c *closures) createClosure(f ast.Function, closure *data.Set[string]) ast.Expr {
 	captured := newVarSet()
-	for _, a := range f.Args {
-		captured.Add(a.Name)
-	}
+	captured.AddSlice(mapSlice(f.Args, argName))
 	captured.AddSet(closure)
 	inner := &closures{captured: captured}
 	inner.fallbackTransformer = fallbackTransformer{inner}

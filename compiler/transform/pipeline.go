@@ -7,11 +7,15 @@ import (
 	"github.com/bobappleyard/lync/util/data"
 )
 
-func Program(p ast.Program) (ast.Program, error) {
+func Program(p ast.Program) ast.Program {
 	p = transformDeclarators(p)
+	p = transformClasses(p)
+	p = transformMemberAccess(p)
+	p = transformBoxing(p)
 	p = transformClosures(p)
+	p = transformFunctionCalls(p)
 
-	return p, nil
+	return p
 }
 
 func newVarSet() *data.Set[string] {
