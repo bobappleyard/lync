@@ -7,8 +7,7 @@ import (
 
 // assumes boxes have been handled
 func transformClosures(p ast.Program) ast.Program {
-	c := new(closures)
-	c.fallbackTransformer = fallbackTransformer{c}
+	c := withFallbackTransformer(new(closures))
 
 	return ast.Program{
 		Stmts: c.transformBlock(p.Stmts),
@@ -28,8 +27,7 @@ type captureAnalyzer struct {
 }
 
 func (c *closures) transformBlock(stmts []ast.Stmt) []ast.Stmt {
-	inner := &closures{captured: c.blockScope(c.captured, stmts)}
-	inner.fallbackTransformer = fallbackTransformer{inner}
+	inner := withFallbackTransformer(&closures{captured: c.blockScope(c.captured, stmts)})
 	return mapSlice(stmts, inner.transformStmt)
 }
 
@@ -47,23 +45,21 @@ func (c *closures) transformExpr(e ast.Expr) ast.Expr {
 func (c *closures) capturedVariables(f ast.Function) *data.Set[string] {
 	locals := newVarSet()
 	locals.AddSlice(mapSlice(f.Args, argName))
-	analyzer := &captureAnalyzer{
+	analyzer := withFallbackAnalzyer(&captureAnalyzer{
 		inScope:  c.captured,
 		locals:   locals,
 		captured: newVarSet(),
-	}
-	analyzer.fallbackAnalyzer = fallbackAnalyzer{analyzer}
+	})
 	analyzer.analyzeBlock(f.Body)
 	return analyzer.captured
 }
 
 func (c *captureAnalyzer) withLocals(locals *data.Set[string]) *captureAnalyzer {
-	inner := &captureAnalyzer{
+	inner := withFallbackAnalzyer(&captureAnalyzer{
 		inScope:  c.inScope,
 		locals:   locals,
 		captured: c.captured,
-	}
-	inner.fallbackAnalyzer = fallbackAnalyzer{inner}
+	})
 	return inner
 }
 
@@ -110,8 +106,7 @@ func (c *closures) createClosure(f ast.Function, closure *data.Set[string]) ast.
 	captured := newVarSet()
 	captured.AddSlice(mapSlice(f.Args, argName))
 	captured.AddSet(closure)
-	inner := &closures{captured: captured}
-	inner.fallbackTransformer = fallbackTransformer{inner}
+	inner := withFallbackTransformer(&closures{captured: captured})
 
 	lifted := ast.Function{
 		Name: f.Name,

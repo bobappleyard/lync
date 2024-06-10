@@ -57,6 +57,13 @@ func (syntax) ParseFunctionExpr(fn funcTok, args argList[ast.Arg], stmts block[a
 	})
 }
 
+func (syntax) ParseClassExpr(class classTok, members block[ast.Member]) ast.Expr {
+	return ast.NodeAt(class.start(), ast.Class{
+		Name:    "",
+		Members: members.stmts,
+	})
+}
+
 func (syntax) ParseArg(arg idTok) ast.Arg {
 	return ast.NodeAt(arg.start(), ast.Arg{
 		Name: arg.text(),
@@ -77,6 +84,13 @@ func (syntax) ParseEmptyReturn(ret returnTok) ast.Stmt {
 
 func (syntax) ParseVarDecl(v varTok, name idTok, _ eqTok, value ast.Expr) ast.Stmt {
 	return ast.NodeAt(v.start(), ast.Variable{
+		Name:  name.text(),
+		Value: value,
+	})
+}
+
+func (syntax) ParseVarAssign(name idTok, _ eqTok, value ast.Expr) ast.Stmt {
+	return ast.NodeAt(name.start(), ast.Assign{
 		Name:  name.text(),
 		Value: value,
 	})

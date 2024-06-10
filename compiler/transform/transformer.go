@@ -1,6 +1,10 @@
 package transform
 
-import "github.com/bobappleyard/lync/compiler/ast"
+import (
+	"unsafe"
+
+	"github.com/bobappleyard/lync/compiler/ast"
+)
 
 type transformer interface {
 	transformBlock(stmts []ast.Stmt) []ast.Stmt
@@ -11,6 +15,15 @@ type transformer interface {
 
 type fallbackTransformer struct {
 	impl transformer
+}
+
+func withFallbackTransformer[T any, PT interface {
+	transformer
+	*T
+}](tr PT) PT {
+	fbt := (*fallbackTransformer)(unsafe.Pointer(tr))
+	fbt.impl = tr
+	return tr
 }
 
 func (t fallbackTransformer) transformBlock(stmts []ast.Stmt) []ast.Stmt {
@@ -108,6 +121,15 @@ type analyzer interface {
 
 type fallbackAnalyzer struct {
 	impl analyzer
+}
+
+func withFallbackAnalzyer[T any, PT interface {
+	analyzer
+	*T
+}](tr PT) PT {
+	fbt := (*fallbackAnalyzer)(unsafe.Pointer(tr))
+	fbt.impl = tr
+	return tr
 }
 
 func (a fallbackAnalyzer) analyzeBlock(stmts []ast.Stmt) {

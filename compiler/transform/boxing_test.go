@@ -162,6 +162,84 @@ func TestBoxing(t *testing.T) {
 			}},
 		},
 		{
+			name: "AssignedInsideCall",
+			in: ast.Program{Stmts: []ast.Stmt{
+				ast.Variable{Name: "x", Value: ast.IntConstant{Value: 1}},
+				ast.Call{
+					Method: ast.Function{Body: []ast.Stmt{
+						ast.Assign{Name: "x", Value: ast.IntConstant{Value: 2}},
+					}},
+				},
+			}},
+			out: ast.Program{Stmts: []ast.Stmt{
+				ast.Variable{Name: "x", Value: ast.Call{
+					Method: ast.MemberAccess{Object: ast.Unit{}, Member: "create_undefined_box"},
+					Args:   []ast.Expr{ast.Name{Name: "x"}},
+				}},
+				ast.Call{
+					Method: ast.MemberAccess{
+						Object: ast.VariableRef{Var: "x"},
+						Member: "define",
+					},
+					Args: []ast.Expr{ast.IntConstant{Value: 1}},
+				},
+				ast.Call{
+					Method: ast.Function{Body: []ast.Stmt{
+						ast.Call{
+							Method: ast.MemberAccess{
+								Object: ast.VariableRef{Var: "x"},
+								Member: "set",
+							},
+							Args: []ast.Expr{ast.IntConstant{Value: 2}},
+						},
+					}},
+				},
+			}},
+		},
+		{
+			name: "AssignedNestedInsideCall",
+			in: ast.Program{Stmts: []ast.Stmt{
+				ast.Variable{Name: "x", Value: ast.IntConstant{Value: 1}},
+				ast.Call{
+					Method: ast.Function{Body: []ast.Stmt{
+						ast.Call{
+							Method: ast.Function{Body: []ast.Stmt{
+								ast.Assign{Name: "x", Value: ast.IntConstant{Value: 2}},
+							}},
+						},
+					}},
+				},
+			}},
+			out: ast.Program{Stmts: []ast.Stmt{
+				ast.Variable{Name: "x", Value: ast.Call{
+					Method: ast.MemberAccess{Object: ast.Unit{}, Member: "create_undefined_box"},
+					Args:   []ast.Expr{ast.Name{Name: "x"}},
+				}},
+				ast.Call{
+					Method: ast.MemberAccess{
+						Object: ast.VariableRef{Var: "x"},
+						Member: "define",
+					},
+					Args: []ast.Expr{ast.IntConstant{Value: 1}},
+				},
+				ast.Call{
+					Method: ast.Function{Body: []ast.Stmt{
+						ast.Call{
+							Method: ast.Function{Body: []ast.Stmt{
+								ast.Call{
+									Method: ast.MemberAccess{
+										Object: ast.VariableRef{Var: "x"},
+										Member: "set",
+									},
+									Args: []ast.Expr{ast.IntConstant{Value: 2}},
+								},
+							}},
+						},
+					}},
+				},
+			}},
+		},
+		{
 			name: "ShadowedAssignment",
 			in: ast.Program{Stmts: []ast.Stmt{
 				ast.Variable{Name: "x", Value: ast.IntConstant{Value: 2}},

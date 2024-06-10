@@ -3,8 +3,7 @@ package transform
 import "github.com/bobappleyard/lync/compiler/ast"
 
 func transformFunctionCalls(p ast.Program) ast.Program {
-	calls := &functionCallTransformer{}
-	calls.fallbackTransformer = fallbackTransformer{calls}
+	calls := withFallbackTransformer(&functionCallTransformer{})
 
 	return ast.Program{Stmts: calls.transformBlock(p.Stmts)}
 }
@@ -19,12 +18,14 @@ func (t *functionCallTransformer) transformExpr(e ast.Expr) ast.Expr {
 		if _, ok := e.Method.(ast.MemberAccess); ok {
 			return t.fallbackTransformer.transformExpr(e)
 		}
+		method := t.transformExpr(e.Method)
+		args := mapSlice(e.Args, t.transformExpr)
 		return ast.Call{
 			Method: ast.MemberAccess{
 				Object: ast.Unit{},
 				Member: "call_function",
 			},
-			Args: append([]ast.Expr{e.Method}, e.Args...),
+			Args: append([]ast.Expr{method}, args...),
 		}
 
 	default:

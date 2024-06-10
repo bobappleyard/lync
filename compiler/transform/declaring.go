@@ -5,8 +5,7 @@ import (
 )
 
 func transformDeclarators(p ast.Program) ast.Program {
-	d := &declarators{}
-	d.fallbackTransformer = fallbackTransformer{d}
+	d := withFallbackTransformer(&declarators{})
 	return ast.Program{Stmts: d.transformBlock(p.Stmts)}
 }
 

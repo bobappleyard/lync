@@ -3,8 +3,7 @@ package transform
 import "github.com/bobappleyard/lync/compiler/ast"
 
 func transformClasses(p ast.Program) ast.Program {
-	classes := &classTransformer{}
-	classes.fallbackTransformer = fallbackTransformer{classes}
+	classes := withFallbackTransformer(&classTransformer{})
 
 	return ast.Program{Stmts: classes.transformBlock(p.Stmts)}
 }
@@ -58,7 +57,8 @@ func (t *classTransformer) implementMember(member ast.Member) ast.Stmt {
 				},
 			},
 		}
-	}
 
-	panic("unreachable")
+	default:
+		panic("unimplemented")
+	}
 }

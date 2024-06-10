@@ -4,8 +4,7 @@ import "github.com/bobappleyard/lync/compiler/ast"
 
 // assumes class syntax has been resolved
 func transformMemberAccess(p ast.Program) ast.Program {
-	members := new(memberAccessTransformer)
-	members.fallbackTransformer = fallbackTransformer{members}
+	members := withFallbackTransformer(new(memberAccessTransformer))
 
 	return ast.Program{Stmts: members.transformBlock(p.Stmts)}
 }
