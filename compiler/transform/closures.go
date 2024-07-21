@@ -28,7 +28,7 @@ type captureAnalyzer struct {
 
 func (c *closures) transformBlock(stmts []ast.Stmt) []ast.Stmt {
 	inner := withFallbackTransformer(&closures{captured: c.blockScope(c.captured, stmts)})
-	return mapSlice(stmts, inner.transformStmt)
+	return data.MapSlice(stmts, inner.transformStmt)
 }
 
 func (c *closures) transformExpr(e ast.Expr) ast.Expr {
@@ -44,7 +44,7 @@ func (c *closures) transformExpr(e ast.Expr) ast.Expr {
 
 func (c *closures) capturedVariables(f ast.Function) *data.Set[string] {
 	locals := newVarSet()
-	locals.AddSlice(mapSlice(f.Args, argName))
+	locals.AddSlice(data.MapSlice(f.Args, argName))
 	analyzer := withFallbackAnalzyer(&captureAnalyzer{
 		inScope:  c.captured,
 		locals:   locals,
@@ -78,14 +78,14 @@ func (c *captureAnalyzer) analyzeExpr(e ast.Expr) {
 	switch s := e.(type) {
 	case ast.VariableRef:
 		if c.inScope.Contains(s.Var) && !c.locals.Contains(s.Var) {
-			c.captured.Add(s.Var)
+			c.captured.Put(s.Var)
 		}
 
 	case ast.Function:
 		locals := newVarSet()
 		locals.AddSet(c.locals)
 		for _, a := range s.Args {
-			locals.Add(a.Name)
+			locals.Put(a.Name)
 		}
 		inner := c.withLocals(locals)
 		inner.analyzeBlock(s.Body)
@@ -104,13 +104,13 @@ func (c *closures) blockScope(base *data.Set[string], ss []ast.Stmt) *data.Set[s
 
 func (c *closures) createClosure(f ast.Function, closure *data.Set[string]) ast.Expr {
 	captured := newVarSet()
-	captured.AddSlice(mapSlice(f.Args, argName))
+	captured.AddSlice(data.MapSlice(f.Args, argName))
 	captured.AddSet(closure)
 	inner := withFallbackTransformer(&closures{captured: captured})
 
 	lifted := ast.Function{
 		Name: f.Name,
-		Args: append(mapSlice(closure.Items(), namedArg), f.Args...),
+		Args: append(data.MapSlice(closure.Items(), namedArg), f.Args...),
 		Body: inner.transformBlock(f.Body),
 	}
 	if closure.Empty() {
@@ -122,7 +122,7 @@ func (c *closures) createClosure(f ast.Function, closure *data.Set[string]) ast.
 			Object: ast.Unit{},
 			Member: "create_closure",
 		},
-		Args: append([]ast.Expr{lifted}, mapSlice(closure.Items(), func(name string) ast.Expr {
+		Args: append([]ast.Expr{lifted}, data.MapSlice(closure.Items(), func(name string) ast.Expr {
 			return ast.VariableRef{Var: name}
 		})...),
 	})

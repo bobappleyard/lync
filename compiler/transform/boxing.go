@@ -91,7 +91,7 @@ func (b *boxing) transformExpr(expr ast.Expr) ast.Expr {
 
 	case ast.Function:
 		args := newVarSet()
-		args.AddSlice(mapSlice(expr.Args, argName))
+		args.AddSlice(data.MapSlice(expr.Args, argName))
 		inner := &boxing{
 			boxed: b.boxed,
 			args:  args,
@@ -140,7 +140,7 @@ func (t *boxScopeAnalyzer) analyzeStmt(stmt ast.Stmt) {
 			return
 		}
 		if t.referred.Contains(stmt.Name) || t.captured.Contains(stmt.Name) {
-			t.boxed.Add(stmt.Name)
+			t.boxed.Put(stmt.Name)
 		}
 
 	case ast.Assign:
@@ -151,7 +151,7 @@ func (t *boxScopeAnalyzer) analyzeStmt(stmt ast.Stmt) {
 			return
 		}
 		if t.inClosure || t.captured.Contains(stmt.Name) {
-			t.boxed.Add(stmt.Name)
+			t.boxed.Put(stmt.Name)
 		}
 
 	default:
@@ -166,15 +166,15 @@ func (t *boxScopeAnalyzer) analyzeExpr(expr ast.Expr) {
 		if t.locals.Contains(expr.Var) {
 			return
 		}
-		t.referred.Add(expr.Var)
+		t.referred.Put(expr.Var)
 		if t.inClosure {
-			t.captured.Add(expr.Var)
+			t.captured.Put(expr.Var)
 		}
 
 	case ast.Function:
 		locals := newVarSet()
 		locals.AddSet(t.locals)
-		locals.AddSlice(mapSlice(expr.Args, argName))
+		locals.AddSlice(data.MapSlice(expr.Args, argName))
 
 		inner := withFallbackAnalzyer(&boxScopeAnalyzer{
 			inClosure: true,

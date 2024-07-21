@@ -1,7 +1,6 @@
 package asm
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -15,32 +14,56 @@ var (
 )
 
 func AssembleProgram(p ast.Program) (lync.Unit, error) {
-	var a assembler
+	a := assembler{
+		enc: &wasmEncoder{},
+	}
 
-	a.assembleBlock(block{stmts: p.Stmts})
+	a.assembleBlock(block{stmts: p.Stmts, enc: a.enc.Block()})
 
 	for a.pending.Ready() {
 		b := a.pending.Dequeue()
-		binary.LittleEndian.PutUint32(a.enc.Buf[b.usedAt+3:], uint32(len(a.enc.Buf)))
 		a.assembleBlock(b)
 	}
 
 	return a.result(byte(requiredRegisters(p.Stmts)))
 }
 
+type moduleEncoder interface {
+	Block() blockEncoder
+	Bytes() []byte
+}
+
+type blockEncoder interface {
+	ID() uint32
+
+	Unit()
+	Name(value lync.Symbol)
+	String(value string)
+	Int(value int)
+	Float(value float64)
+	Block(argc, varc byte, id uint32)
+
+	Load(from lync.Register)
+	Store(into lync.Register)
+
+	Call(method lync.Symbol, argc byte)
+	CallTail(method lync.Symbol, argc byte)
+	Return()
+}
+
 type assembler struct {
 	err     error
-	enc     lync.BytecodeEncoder
+	enc     moduleEncoder
 	pending data.Queue[block]
 	methods []string
 }
 
 type block struct {
-	usedAt uint32
-	vars   []string
-	args   []string
-	regc   int
-	stmts  []ast.Stmt
+	enc   blockEncoder
+	vars  []string
+	args  []string
+	regc  int
+	stmts []ast.Stmt
 }
 
 func (a *assembler) result(regs byte) (lync.Unit, error) {
@@ -49,8 +72,8 @@ func (a *assembler) result(regs byte) (lync.Unit, error) {
 	}
 	return lync.Unit{
 		Registers: regs,
-		Code:      a.enc.Buf,
-		Methods:   a.methods,
+		Code:      a.enc.Bytes(),
+		Symbols:   a.methods,
 	}, nil
 }
 
@@ -71,13 +94,13 @@ func (a *assembler) assembleStmt(b block, s ast.Stmt) {
 	switch s := s.(type) {
 	case ast.Return:
 		if e, ok := s.Value.(ast.Call); ok {
-			a.assembleCall(b, e, (*lync.BytecodeEncoder).CallTail)
+			a.assembleCall(b, e, blockEncoder.CallTail)
 		} else {
 			a.assembleExpr(b, s.Value)
 			if a.err != nil {
 				return
 			}
-			a.err = a.enc.Return()
+			b.enc.Return()
 		}
 
 	case ast.Variable:
@@ -101,7 +124,7 @@ func (a *assembler) assembleDefineVariable(b block, name string) {
 		a.err = fmt.Errorf("non-block variable %s: %w", name, ErrUnsupported)
 		return
 	}
-	a.err = a.enc.Store(lync.Register(off))
+	b.enc.Store(lync.Register(off))
 }
 
 func (a *assembler) assembleExpr(b block, e ast.Expr) {
@@ -111,19 +134,19 @@ func (a *assembler) assembleExpr(b block, e ast.Expr) {
 
 	switch e := e.(type) {
 	case ast.Unit:
-		a.err = a.enc.Unit()
+		b.enc.Unit()
 
 	case ast.Name:
-		a.err = a.enc.Name(a.methodID(e.Name))
+		b.enc.Name(a.methodID(e.Name))
 
 	case ast.StringConstant:
-		a.err = a.enc.String(e.Value)
+		b.enc.String(e.Value)
 
 	case ast.IntConstant:
-		a.err = a.enc.Int(e.Value)
+		b.enc.Int(e.Value)
 
 	case ast.FltConstant:
-		a.err = a.enc.Float(e.Value)
+		b.enc.Float(e.Value)
 
 	case ast.VariableRef:
 		off := b.variableOffset(e.Var)
@@ -131,41 +154,42 @@ func (a *assembler) assembleExpr(b block, e ast.Expr) {
 			a.err = fmt.Errorf("non-block variable %s: %w", e.Var, ErrUnsupported)
 			return
 		}
-		a.err = a.enc.Load(lync.Register(off))
+		b.enc.Load(lync.Register(off))
 
 	case ast.Call:
-		a.assembleCall(b, e, (*lync.BytecodeEncoder).Call)
+		a.assembleCall(b, e, blockEncoder.Call)
 
 	case ast.Function:
 		args := getArgs(e.Args)
 		vars := bindings(e.Body)
 		regc := requiredRegisters(e.Body)
+		enc := a.enc.Block()
 		a.pending.Enqueue(block{
-			usedAt: uint32(len(a.enc.Buf)),
-			args:   args,
-			vars:   vars,
-			regc:   regc,
-			stmts:  e.Body,
+			enc:   enc,
+			args:  args,
+			vars:  vars,
+			regc:  regc,
+			stmts: e.Body,
 		})
-		a.err = a.enc.Block(byte(len(args)), byte(len(vars)+regc), 0)
+		b.enc.Block(byte(len(args)), byte(len(vars)+regc), enc.ID())
 
 	default:
 		a.err = fmt.Errorf("%T: %w", e, ErrUnsupported)
 	}
 }
 
-func (a *assembler) assembleCall(b block, e ast.Call, write func(*lync.BytecodeEncoder, lync.MethodID, byte) error) {
+func (a *assembler) assembleCall(b block, e ast.Call, write func(blockEncoder, lync.Symbol, byte)) {
 	for i, x := range e.Args {
 		a.assembleExpr(b, x)
 		if a.err != nil {
 			return
 		}
-		a.err = a.enc.Store(lync.Register(i))
+		b.enc.Store(lync.Register(i))
 	}
 
 	m, ok := e.Method.(ast.MemberAccess)
 	if !ok {
-		a.err = fmt.Errorf("calling objects as functions: %w", ErrUnsupported)
+		fmt.Errorf("calling objects as functions: %w", ErrUnsupported)
 		return
 	}
 
@@ -173,7 +197,7 @@ func (a *assembler) assembleCall(b block, e ast.Call, write func(*lync.BytecodeE
 	if a.err != nil {
 		return
 	}
-	a.err = write(&a.enc, a.methodID(m.Member), byte(len(e.Args)))
+	write(b.enc, a.methodID(m.Member), byte(len(e.Args)))
 }
 
 const frameWidth = 2
@@ -192,15 +216,15 @@ func (b block) variableOffset(name string) int {
 	return -1
 }
 
-func (a *assembler) methodID(name string) lync.MethodID {
+func (a *assembler) methodID(name string) lync.Symbol {
 	for i, m := range a.methods {
 		if name == m {
-			return lync.MethodID(i)
+			return lync.Symbol(i)
 		}
 	}
 	ret := len(a.methods)
 	a.methods = append(a.methods, name)
-	return lync.MethodID(ret)
+	return lync.Symbol(ret)
 }
 
 func bindings(stmts []ast.Stmt) []string {

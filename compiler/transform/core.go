@@ -4,7 +4,20 @@ import (
 	"unsafe"
 
 	"github.com/bobappleyard/lync/compiler/ast"
+	"github.com/bobappleyard/lync/util/data"
 )
+
+func Program(p ast.Program) ast.Program {
+	p = transformDeclarators(p)
+	p = transformClasses(p)
+	p = transformMemberAccess(p)
+	p = transformGlobals(p)
+	p = transformBoxing(p)
+	p = transformClosures(p)
+	p = transformFunctionCalls(p)
+
+	return p
+}
 
 type transformer interface {
 	transformBlock(stmts []ast.Stmt) []ast.Stmt
@@ -27,7 +40,7 @@ func withFallbackTransformer[T any, PT interface {
 }
 
 func (t fallbackTransformer) transformBlock(stmts []ast.Stmt) []ast.Stmt {
-	return mapSlice(stmts, t.impl.transformStmt)
+	return data.MapSlice(stmts, t.impl.transformStmt)
 }
 
 func (t fallbackTransformer) transformStmt(stmt ast.Stmt) ast.Stmt {
@@ -76,13 +89,13 @@ func (t fallbackTransformer) transformExpr(expr ast.Expr) ast.Expr {
 	case ast.Call:
 		return ast.Call{
 			Method: t.impl.transformExpr(expr.Method),
-			Args:   mapSlice(expr.Args, t.impl.transformExpr),
+			Args:   data.MapSlice(expr.Args, t.impl.transformExpr),
 		}
 
 	case ast.Class:
 		return ast.Class{
 			Name:    expr.Name,
-			Members: mapSlice(expr.Members, t.impl.transformMember),
+			Members: data.MapSlice(expr.Members, t.impl.transformMember),
 		}
 
 	case ast.Function:

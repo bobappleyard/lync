@@ -1,6 +1,9 @@
 package transform
 
-import "github.com/bobappleyard/lync/compiler/ast"
+import (
+	"github.com/bobappleyard/lync/compiler/ast"
+	"github.com/bobappleyard/lync/util/data"
+)
 
 func transformClasses(p ast.Program) ast.Program {
 	classes := withFallbackTransformer(&classTransformer{})
@@ -28,7 +31,7 @@ func (t *classTransformer) transformExpr(expr ast.Expr) ast.Expr {
 	case ast.Class:
 		var body []ast.Stmt
 		body = append(body, classInit)
-		body = append(body, mapSlice(expr.Members, t.implementMember)...)
+		body = append(body, data.MapSlice(expr.Members, t.implementMember)...)
 		body = append(body, ast.Return{Value: ast.VariableRef{Var: "@"}})
 
 		return ast.Call{Method: ast.Function{Body: body}}

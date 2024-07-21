@@ -1,6 +1,9 @@
 package transform
 
-import "github.com/bobappleyard/lync/compiler/ast"
+import (
+	"github.com/bobappleyard/lync/compiler/ast"
+	"github.com/bobappleyard/lync/util/data"
+)
 
 // assumes class syntax has been resolved
 func transformMemberAccess(p ast.Program) ast.Program {
@@ -62,7 +65,7 @@ func (m *memberAccessTransformer) transformExpr(expr ast.Expr) ast.Expr {
 					Object: m.transformExpr(method.Object),
 					Member: method.Member,
 				},
-				Args: mapSlice(expr.Args, m.transformExpr),
+				Args: data.MapSlice(expr.Args, m.transformExpr),
 			}
 		}
 		return m.fallbackTransformer.transformExpr(expr)

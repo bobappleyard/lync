@@ -1,6 +1,9 @@
 package transform
 
-import "github.com/bobappleyard/lync/compiler/ast"
+import (
+	"github.com/bobappleyard/lync/compiler/ast"
+	"github.com/bobappleyard/lync/util/data"
+)
 
 func transformFunctionCalls(p ast.Program) ast.Program {
 	calls := withFallbackTransformer(&functionCallTransformer{})
@@ -19,7 +22,7 @@ func (t *functionCallTransformer) transformExpr(e ast.Expr) ast.Expr {
 			return t.fallbackTransformer.transformExpr(e)
 		}
 		method := t.transformExpr(e.Method)
-		args := mapSlice(e.Args, t.transformExpr)
+		args := data.MapSlice(e.Args, t.transformExpr)
 		return ast.Call{
 			Method: ast.MemberAccess{
 				Object: ast.Unit{},

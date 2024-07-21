@@ -25,7 +25,7 @@ func (t *globalsTransformer) transformBlock(stmts []ast.Stmt) []ast.Stmt {
 	locals.AddSet(blockVars(stmts))
 	inner := withFallbackTransformer(&globalsTransformer{nonGlobal: locals})
 
-	return mapSlice(stmts, inner.transformStmt)
+	return data.MapSlice(stmts, inner.transformStmt)
 }
 
 func (t *globalsTransformer) transformStmt(stmt ast.Stmt) ast.Stmt {
@@ -60,7 +60,7 @@ func (t *globalsTransformer) transformExpr(expr ast.Expr) ast.Expr {
 	case ast.Function:
 		locals := newVarSet()
 		locals.AddSet(t.nonGlobal)
-		locals.AddSlice(mapSlice(expr.Args, argName))
+		locals.AddSlice(data.MapSlice(expr.Args, argName))
 		inner := withFallbackTransformer(&globalsTransformer{nonGlobal: locals})
 		return ast.Function{
 			Name: expr.Name,

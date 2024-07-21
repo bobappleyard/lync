@@ -2,6 +2,7 @@ package transform
 
 import (
 	"github.com/bobappleyard/lync/compiler/ast"
+	"github.com/bobappleyard/lync/util/data"
 )
 
 func transformDeclarators(p ast.Program) ast.Program {
@@ -22,7 +23,7 @@ func (d *declarators) transformStmt(s ast.Stmt) ast.Stmt {
 		}
 		return ast.Variable{
 			Name:  s.Name,
-			Value: ast.Class{Members: mapSlice(s.Members, d.transformMember)},
+			Value: ast.Class{Members: data.MapSlice(s.Members, d.transformMember)},
 		}
 
 	case ast.Function:

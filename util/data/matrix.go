@@ -1,6 +1,9 @@
 package data
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 type SparseMatrix[T any] struct {
 	entries []matrixEntry[T]
@@ -22,6 +25,13 @@ type matrixEntry[T any] struct {
 type matrixRow struct {
 	offset int
 	start  int
+}
+
+func (m *SparseMatrix[T]) Copy() *SparseMatrix[T] {
+	return &SparseMatrix[T]{
+		entries: slices.Clone(m.entries),
+		rows:    slices.Clone(m.rows),
+	}
 }
 
 func (m *SparseMatrix[T]) AddRow(elements []SparseMatrixElement[T]) int {

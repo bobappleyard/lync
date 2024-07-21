@@ -1,133 +1,44 @@
 package asm
 
 import (
-	"fmt"
+	"context"
 	"testing"
 
-	"github.com/bobappleyard/lync"
-	"github.com/bobappleyard/lync/compiler/ast"
-	"github.com/bobappleyard/lync/util/assert"
+	"github.com/bobappleyard/lync/util/wasm"
+	"github.com/tetratelabs/wazero"
 )
 
-func TestAssemble(t *testing.T) {
-	p := ast.Program{
-		Stmts: []ast.Stmt{
-			ast.Call{
-				Method: ast.MemberAccess{
-					Object: ast.Unit{},
-					Member: "set_global",
-				},
-				Args: []ast.Expr{
-					ast.Name{Name: "f"},
-					ast.Function{
-						Name: "f",
-						Args: []ast.Arg{{Name: "x"}, {Name: "y"}},
-						Body: []ast.Stmt{
-							ast.Return{Value: ast.Call{
-								Method: ast.MemberAccess{
-									Object: ast.VariableRef{Var: "x"},
-									Member: "method",
-								},
-								Args: []ast.Expr{
-									ast.VariableRef{Var: "y"},
-								},
-							}},
-						},
-					},
-				},
-			},
-			ast.Return{Value: ast.Call{
-				Method: ast.MemberAccess{
-					Object: ast.Unit{},
-					Member: "null",
-				},
-			}},
-		},
+func TestMemory(t *testing.T) {
+	var c wasm.Code
+	c.I32Const(1)
+	c.I32Const(4)
+	c.StoreInt32(2, 0)
+	c.I32Const(0)
+	c.LoadInt32(2, 0)
+	c.End()
+
+	m := (&wasm.Module{
+		Memories: []wasm.Memory{wasm.MinMemory{Min: 4096}},
+		Types:    []wasm.Type{wasm.FuncType{Out: []wasm.Type{wasm.Int32}}},
+		Exports:  []wasm.Export{wasm.FuncExport{Name: "example", Func: 0}},
+		Funcs:    []wasm.Index{0},
+		Codes:    []*wasm.Code{&c},
+	}).AppendWasm(nil)
+
+	ctx := context.Background()
+	r := wazero.NewRuntime(ctx)
+	mod, err := r.Instantiate(ctx, m)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	buf, err := AssembleProgram(p)
-
-	assert.Nil(t, err)
-
-	dec := lync.BytecodeDecoder{
-		Code: buf.Code,
-		Impl: &testProcessor{},
+	res, err := mod.ExportedFunction("example").Call(ctx)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	for dec.Pos < len(dec.Code) {
-		dec.Step()
-	}
-
-	t.Log(buf)
+	t.Log(res)
 	t.Fail()
 }
-
-type testProcessor struct {
-}
-
-// Block implements lync.Bytecode.
-func (t *testProcessor) Block(argc byte, varc byte, entry lync.CodeRef) {
-	fmt.Println("Block", argc, varc, entry)
-}
-
-// Branch implements lync.Bytecode.
-func (t *testProcessor) Branch(ref lync.CodeRef) {
-	fmt.Println("Branch", ref)
-}
-
-// Call implements lync.Bytecode.
-func (t *testProcessor) Call(method lync.MethodID, argc byte) {
-	fmt.Println("Call", method, argc)
-}
-
-// CallTail implements lync.Bytecode.
-func (t *testProcessor) CallTail(method lync.MethodID, argc byte) {
-	fmt.Println("CallTail", method, argc)
-}
-
-// Float implements lync.Bytecode.
-func (t *testProcessor) Float(value float64) {
-	fmt.Println("Float", value)
-}
-
-// Int implements lync.Bytecode.
-func (t *testProcessor) Int(value int) {
-	fmt.Println("Int", value)
-}
-
-// Jump implements lync.Bytecode.
-func (t *testProcessor) Jump(ref lync.CodeRef) {
-	fmt.Println("Jump", ref)
-}
-
-// Load implements lync.Bytecode.
-func (t *testProcessor) Load(r lync.Register) {
-	fmt.Println("Load", r)
-}
-
-// Name implements lync.Bytecode.
-func (t *testProcessor) Name(id lync.MethodID) {
-	fmt.Println("Name", id)
-}
-
-// Return implements lync.Bytecode.
-func (t *testProcessor) Return() {
-	fmt.Println("Return")
-}
-
-// Store implements lync.Bytecode.
-func (t *testProcessor) Store(r lync.Register) {
-	fmt.Println("Store", r)
-}
-
-// String implements lync.Bytecode.
-func (t *testProcessor) String(value string) {
-	fmt.Println("String", value)
-}
-
-// Unit implements lync.Bytecode.
-func (t *testProcessor) Unit() {
-	fmt.Println("Unit")
-}
-
-var _ lync.Bytecode = &testProcessor{}

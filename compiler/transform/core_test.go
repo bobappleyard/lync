@@ -25,3 +25,7 @@ func TestWithTransformer(t *testing.T) {
 
 	assert.Equal(t, tr.transformStmt(in), ast.Stmt(in))
 }
+
+func TestFallbackIdentity(t *testing.T) {
+
+}
