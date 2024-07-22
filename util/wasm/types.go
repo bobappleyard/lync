@@ -3,6 +3,7 @@ package wasm
 type Type interface {
 	WasmAppender
 	typ()
+	Matches(t Type) bool
 }
 
 type FuncType struct {
@@ -18,6 +19,35 @@ func (t FuncType) AppendWasm(buf []byte) []byte {
 	return buf
 }
 
+func (t FuncType) Matches(u Type) bool {
+	uf, ok := u.(FuncType)
+	if !ok {
+		return false
+	}
+
+	if len(uf.In) != len(t.In) {
+		return false
+	}
+	if len(uf.Out) != len(t.Out) {
+		return false
+	}
+
+	for i, a := range t.In {
+		b := uf.In[i]
+		if !a.Matches(b) {
+			return false
+		}
+	}
+	for i, a := range t.Out {
+		b := uf.Out[i]
+		if !a.Matches(b) {
+			return false
+		}
+	}
+
+	return true
+}
+
 type NumberType byte
 
 const (
@@ -31,4 +61,8 @@ func (NumberType) typ() {}
 
 func (t NumberType) AppendWasm(buf []byte) []byte {
 	return append(buf, byte(t))
+}
+
+func (t NumberType) Matches(u Type) bool {
+	return t == u
 }
