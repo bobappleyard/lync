@@ -1,6 +1,6 @@
 package wasm
 
-type Table uint32
+type Table byte
 
 const (
 	FuncTable   Table = 0x70
@@ -8,5 +8,22 @@ const (
 )
 
 func (t Table) AppendWasm(buf []byte) []byte {
-	return appendUint32(buf, uint32(t))
+	return append(buf, byte(t), 0, 0)
+}
+
+type Element interface {
+	WasmAppender
+	element()
+}
+
+type FuncElement struct {
+	Funcs []Index
+}
+
+func (FuncElement) element() {}
+
+func (e *FuncElement) AppendWasm(buf []byte) []byte {
+	buf = append(buf, 1, 0)
+	buf = appendVector(buf, e.Funcs)
+	return buf
 }

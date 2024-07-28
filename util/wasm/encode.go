@@ -37,8 +37,11 @@ func appendString(buf []byte, s string) []byte {
 	return appendBytes(buf, []byte(s))
 }
 
-func appendSection(buf []byte, id byte, sec []byte) []byte {
+func appendSection[T WasmAppender](buf []byte, id byte, sec []T) []byte {
+	if len(sec) == 0 {
+		return buf
+	}
 	buf = append(buf, id)
-	buf = appendBytes(buf, sec)
+	buf = appendBytes(buf, appendVector(nil, sec))
 	return buf
 }

@@ -189,7 +189,7 @@ func (a *assembler) assembleCall(b block, e ast.Call, write func(blockEncoder, l
 
 	m, ok := e.Method.(ast.MemberAccess)
 	if !ok {
-		fmt.Errorf("calling objects as functions: %w", ErrUnsupported)
+		a.err = fmt.Errorf("calling objects as functions: %w", ErrUnsupported)
 		return
 	}
 

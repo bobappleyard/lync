@@ -39,3 +39,10 @@ func (e FuncImport) AppendWasm(buf []byte) []byte {
 	buf = e.Type.AppendWasm(buf)
 	return buf
 }
+
+type MemoryExport struct {
+	Name string
+	Mem  Index
+}
+
+func (MemoryExport) export() {}

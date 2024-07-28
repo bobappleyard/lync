@@ -41,18 +41,80 @@ func TestLogic(t *testing.T) {
 	testModule(t, m, 1, 21)
 }
 
+func TestCall(t *testing.T) {
+	var f Code
+	f.LocalGet(0)
+	f.I32Const(1)
+	f.I32Add()
+	f.End()
+
+	var g Code
+	g.LocalGet(0)
+	g.Call(0)
+	g.End()
+
+	var m Module
+	m.Func([]Type{Int32}, []Type{Int32}, &f)
+	m.Func([]Type{Int32}, []Type{Int32}, &g)
+	m.Exports = []Export{FuncExport{Name: "test", Func: 1}}
+
+	testModule(t, m, 10, 11)
+}
+
+func TestCallIndirect(t *testing.T) {
+	var f Code
+	f.LocalGet(0)
+	f.I32Const(1)
+	f.I32Add()
+	f.End()
+
+	var g Code
+	g.locals = []LocalDecl{{1, Int32}}
+
+	// TableGrow: [fillWith, growAmount] -> [oldSize]
+	g.NullFunc()
+	g.I32Const(10)
+	g.TableGrow(0)
+	g.Drop()
+
+	// TableGrow: [fillWith, growAmount] -> [oldSize]
+	g.NullFunc()
+	g.I32Const(1)
+	g.TableGrow(0)
+	g.LocalSet(1)
+	g.LocalGet(1)
+
+	// TableInit: [destPos, srcPos, size] -> []
+	g.I32Const(0)
+	g.I32Const(1)
+	g.TableInit(0, 0)
+
+	g.LocalGet(0)
+	g.LocalGet(1)
+	g.CallIndirect(0)
+	g.End()
+
+	var m Module
+	m.Types = []Type{FuncType{In: []Type{Int32}, Out: []Type{Int32}}}
+	m.Func([]Type{Int32}, []Type{Int32}, &f)
+	m.Func([]Type{Int32}, []Type{Int32}, &g)
+	m.Tables = []Table{FuncTable}
+	m.Elements = []Element{&FuncElement{Funcs: []Index{0}}}
+	m.Exports = []Export{FuncExport{Name: "test", Func: 1}}
+
+	t.Log(m.AppendWasm(nil))
+
+	testModule(t, m, 5, 6)
+}
+
 func testModule(t *testing.T, m Module, in, out int32) {
+	t.Helper()
+
 	engine := wasmer.NewEngine()
 	store := wasmer.NewStore(engine)
 	imp := wasmer.NewImportObject()
 
 	mbytes := m.AppendWasm(nil)
-	// err := os.WriteFile(t.Name()+".wasm", mbytes, 0666)
-	// if err != nil {
-	// 	t.Error(err)
-	// 	return
-	// }
-
 	mod, err := wasmer.NewModule(store, mbytes)
 	if err != nil {
 		t.Error(err)
@@ -77,25 +139,4 @@ func testModule(t *testing.T, m Module, in, out int32) {
 		return
 	}
 	assert.Equal(t, res.(int32), out)
-}
-
-func TestMemory(t *testing.T) {
-	var c Code
-	c.I32Const(1)
-	c.If()
-	c.I32Const(0)
-	c.I32Const(4)
-	c.StoreInt32(2, 0)
-	c.End()
-	c.I32Const(0)
-	c.LoadInt32(2, 0)
-	c.End()
-
-	var m Module
-	m.Func([]Type{Int32}, []Type{Int32}, &c)
-	m.Memories = []Memory{MinMemory{Min: 4096}}
-	m.Exports = []Export{FuncExport{Name: "test", Func: 0}}
-
-	testModule(t, m, 0, 4)
-
 }
