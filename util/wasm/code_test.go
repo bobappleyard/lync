@@ -13,15 +13,15 @@ func TestConst(t *testing.T) {
 	c.End()
 
 	var m Module
-	m.Func([]Type{Int32}, []Type{Int32}, &c)
-	m.Exports = []Export{FuncExport{Name: "test", Func: 0}}
+	m.AddExportedFunc("test", []Type{Int32}, []Type{Int32}, &c)
 
 	testModule(t, m, 0, 12)
 }
 
 func TestLogic(t *testing.T) {
 	var c Code
-	c.locals = []LocalDecl{{1, Int32}}
+	c.Locals = []LocalDecl{{1, Int32}}
+
 	c.LocalGet(0)
 	c.If()
 	c.I32Const(21)
@@ -34,8 +34,7 @@ func TestLogic(t *testing.T) {
 	c.End()
 
 	var m Module
-	m.Func([]Type{Int32}, []Type{Int32}, &c)
-	m.Exports = []Export{FuncExport{Name: "test", Func: 0}}
+	m.AddExportedFunc("test", []Type{Int32}, []Type{Int32}, &c)
 
 	testModule(t, m, 0, 1)
 	testModule(t, m, 1, 21)
@@ -54,8 +53,8 @@ func TestCall(t *testing.T) {
 	g.End()
 
 	var m Module
-	m.Func([]Type{Int32}, []Type{Int32}, &f)
-	m.Func([]Type{Int32}, []Type{Int32}, &g)
+	m.AddFunc([]Type{Int32}, []Type{Int32}, &f)
+	m.AddFunc([]Type{Int32}, []Type{Int32}, &g)
 	m.Exports = []Export{FuncExport{Name: "test", Func: 1}}
 
 	testModule(t, m, 10, 11)
@@ -69,7 +68,7 @@ func TestCallIndirect(t *testing.T) {
 	f.End()
 
 	var g Code
-	g.locals = []LocalDecl{{1, Int32}}
+	g.Locals = []LocalDecl{{1, Int32}}
 
 	// TableGrow: [fillWith, growAmount] -> [oldSize]
 	g.NullFunc()
@@ -96,8 +95,8 @@ func TestCallIndirect(t *testing.T) {
 
 	var m Module
 	m.Types = []Type{FuncType{In: []Type{Int32}, Out: []Type{Int32}}}
-	m.Func([]Type{Int32}, []Type{Int32}, &f)
-	m.Func([]Type{Int32}, []Type{Int32}, &g)
+	m.AddFunc([]Type{Int32}, []Type{Int32}, &f)
+	m.AddFunc([]Type{Int32}, []Type{Int32}, &g)
 	m.Tables = []Table{FuncTable}
 	m.Elements = []Element{&FuncElement{Funcs: []Index{0}}}
 	m.Exports = []Export{FuncExport{Name: "test", Func: 1}}

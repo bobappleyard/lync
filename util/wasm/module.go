@@ -22,21 +22,34 @@ func (m *Module) AppendWasm(mod []byte) []byte {
 	return mod
 }
 
-func (m *Module) Func(in []Type, out []Type, code *Code) {
-	typeId := -1
-	for i, t := range m.Types {
-		if !t.Matches(FuncType{In: in, Out: out}) {
+func (m *Module) EnsureType(t Type) Index {
+	typeID := -1
+	for i, u := range m.Types {
+		if !t.Matches(u) {
 			continue
 		}
-		typeId = i
+		typeID = i
 		break
 	}
-	if typeId == -1 {
-		typeId = len(m.Types)
-		m.Types = append(m.Types, FuncType{In: in, Out: out})
+	if typeID == -1 {
+		typeID = len(m.Types)
+		m.Types = append(m.Types, t)
 	}
-	m.Funcs = append(m.Funcs, Index(typeId))
+	return Index(typeID)
+}
+
+func (m *Module) AddFunc(in []Type, out []Type, code *Code) Index {
+	typeID := m.EnsureType(FuncType{In: in, Out: out})
+	res := len(m.Funcs)
+	m.Funcs = append(m.Funcs, typeID)
 	m.Codes = append(m.Codes, code)
+	return Index(res)
+}
+
+func (m *Module) AddExportedFunc(name string, in []Type, out []Type, code *Code) Index {
+	funcID := m.AddFunc(in, out, code)
+	m.Exports = append(m.Exports, FuncExport{Name: name, Func: funcID})
+	return funcID
 }
 
 func (m *Module) wasmHeader(buf []byte) []byte {

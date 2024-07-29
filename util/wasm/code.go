@@ -1,8 +1,8 @@
 package wasm
 
 type Code struct {
-	locals []LocalDecl
-	code   []byte
+	Locals       []LocalDecl
+	Instructions []byte
 }
 
 type LocalDecl struct {
@@ -12,8 +12,8 @@ type LocalDecl struct {
 
 func (c *Code) AppendWasm(buf []byte) []byte {
 	var tmp []byte
-	tmp = appendVector(tmp, c.locals)
-	tmp = append(tmp, c.code...)
+	tmp = appendVector(tmp, c.Locals)
+	tmp = append(tmp, c.Instructions...)
 
 	buf = appendBytes(buf, tmp)
 	return buf
@@ -27,13 +27,14 @@ func (c LocalDecl) AppendWasm(buf []byte) []byte {
 }
 
 func (c *Code) op(code byte, args ...uint32) {
-	c.code = append(c.code, code)
+	c.Instructions = append(c.Instructions, code)
 	for _, arg := range args {
-		c.code = appendUint32(c.code, arg)
+		c.Instructions = appendUint32(c.Instructions, arg)
 	}
 }
 func (c *Code) Call(idx uint32)         { c.op(0x10, idx) }
 func (c *Code) CallIndirect(idx uint32) { c.op(0x11, idx, 0) }
+func (c *Code) Loop()                   { c.op(0x03, 0x40) }
 func (c *Code) If()                     { c.op(0x04, 0x40) }
 func (c *Code) Else()                   { c.op(0x05) }
 func (c *Code) End()                    { c.op(0x0b) }
@@ -50,6 +51,13 @@ func (c *Code) TableGrow(table uint32)       { c.op(0xfc, 0xf, table) }
 func (c *Code) TableGet(table uint32)        { c.op(0x25, table) }
 
 func (c *Code) I32Const(x uint32)             { c.op(0x41, x) }
+func (c *Code) I32Eqz()                       { c.op(0x45) }
+func (c *Code) I32Eq()                        { c.op(0x46) }
+func (c *Code) I32Ne()                        { c.op(0x47) }
+func (c *Code) I32Lts()                       { c.op(0x48) }
+func (c *Code) I32Gts()                       { c.op(0x4a) }
+func (c *Code) I32Les()                       { c.op(0x4c) }
+func (c *Code) I32Ges()                       { c.op(0x4e) }
 func (c *Code) I32Load(align, offset uint32)  { c.op(0x28, align, offset) }
 func (c *Code) I32Store(align, offset uint32) { c.op(0x36, align, offset) }
 func (c *Code) I32Add()                       { c.op(0x6a) }
