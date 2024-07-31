@@ -78,9 +78,9 @@ func TestCallIndirect(t *testing.T) {
 	g.I32Const(1)
 	g.TableGrow(0)
 	g.LocalSet(1)
-	g.LocalGet(1)
 
 	// TableInit: [destPos, srcPos, size] -> []
+	g.LocalGet(1)
 	g.I32Const(0)
 	g.I32Const(1)
 	g.TableInit(0, 0)
@@ -93,11 +93,67 @@ func TestCallIndirect(t *testing.T) {
 	m.Types = []Type{FuncType{In: []Type{Int32}, Out: []Type{Int32}}}
 	m.Tables = []Table{FuncTable}
 	m.Elements = []Element{&FuncElement{Funcs: []Index{0}}}
-	m.Exports = []Export{FuncExport{Name: "test", Func: 1}}
-
-	t.Log(m.AppendWasm(nil))
 
 	testModule(t, m, 5, 6)
+}
+
+func TestLoop(t *testing.T) {
+	var m Module
+	c := m.AddExportedFunc("test", []Type{Int32}, []Type{Int32})
+
+	// var acc = 0
+	c.Locals = []LocalDecl{{1, Int32}}
+
+	c.Loop()
+
+	// acc = acc + n
+	c.LocalGet(0)
+	c.LocalGet(1)
+	c.I32Add()
+	c.LocalSet(1)
+
+	// n = n - 1
+	c.LocalGet(0)
+	c.I32Const(1)
+	c.I32Sub()
+	c.LocalSet(0)
+
+	// for n > 0
+	c.LocalGet(0)
+	c.BrIf(0)
+
+	c.End()
+
+	c.LocalGet(1)
+	c.End()
+
+	testModule(t, m, 3, 6)
+}
+
+func TestMemory(t *testing.T) {
+	var m Module
+	m.Memories = []Memory{MinMemory{0}}
+
+	c := m.AddExportedFunc("test", []Type{Int32}, []Type{Int32})
+	c.Locals = []LocalDecl{{1, Int32}}
+
+	// [amt] -> [old]
+	c.I32Const(1)
+	c.MemGrow()
+	c.LocalSet(1)
+
+	// [addr, val] -> []
+	c.I32Const(1024)
+	c.I32Const(45)
+	c.I32Store(2, 0)
+
+	// [addr] -> [val]
+	c.I32Const(1024)
+	c.I32Load(2, 0)
+
+	c.End()
+
+	testModule(t, m, 0, 45)
 }
 
 func testModule(t *testing.T, m Module, in, out int32) {

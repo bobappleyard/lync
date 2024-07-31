@@ -5,6 +5,7 @@ type Module struct {
 	Imports  []Import
 	Funcs    []Index
 	Tables   []Table
+	Memories []Memory
 	Exports  []Export
 	Codes    []*Code
 	Elements []Element
@@ -27,6 +28,7 @@ func (m *Module) AppendWasm(mod []byte) []byte {
 	mod = appendSection(mod, 2, m.Imports)
 	mod = appendSection(mod, 3, m.Funcs)
 	mod = appendSection(mod, 4, m.Tables)
+	mod = appendSection(mod, 5, m.Memories)
 	mod = appendSection(mod, 7, m.Exports)
 	mod = appendSection(mod, 9, m.Elements)
 	mod = appendSection(mod, 10, m.Codes)
