@@ -1,15 +1,5 @@
 package wasm
 
-type Code struct {
-	Locals       []LocalDecl
-	Instructions []byte
-}
-
-type LocalDecl struct {
-	Count uint32
-	Type  Type
-}
-
 func (c *Code) AppendWasm(buf []byte) []byte {
 	var tmp []byte
 	tmp = appendVector(tmp, c.Locals)
@@ -38,6 +28,8 @@ func (c *Code) Loop()                   { c.op(0x03, 0x40) }
 func (c *Code) If()                     { c.op(0x04, 0x40) }
 func (c *Code) Else()                   { c.op(0x05) }
 func (c *Code) End()                    { c.op(0x0b) }
+func (c *Code) Br(depth uint32)         { c.op(0x0c, depth) }
+func (c *Code) BrIf(depth uint32)       { c.op(0x0d, depth) }
 func (c *Code) Drop()                   { c.op(0x1a) }
 func (c *Code) LocalGet(idx uint32)     { c.op(0x20, idx) }
 func (c *Code) LocalSet(idx uint32)     { c.op(0x21, idx) }

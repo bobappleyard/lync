@@ -10,6 +10,17 @@ type Module struct {
 	Elements []Element
 }
 
+type Code struct {
+	Func         Index
+	Locals       []LocalDecl
+	Instructions []byte
+}
+
+type LocalDecl struct {
+	Count uint32
+	Type  Type
+}
+
 func (m *Module) AppendWasm(mod []byte) []byte {
 	mod = m.wasmHeader(mod)
 	mod = appendSection(mod, 1, m.Types)
@@ -38,18 +49,19 @@ func (m *Module) EnsureType(t Type) Index {
 	return Index(typeID)
 }
 
-func (m *Module) AddFunc(in []Type, out []Type, code *Code) Index {
+func (m *Module) AddFunc(in []Type, out []Type) *Code {
 	typeID := m.EnsureType(FuncType{In: in, Out: out})
-	res := len(m.Funcs)
+	idx := len(m.Funcs)
+	res := &Code{Func: Index(idx)}
 	m.Funcs = append(m.Funcs, typeID)
-	m.Codes = append(m.Codes, code)
-	return Index(res)
+	m.Codes = append(m.Codes, res)
+	return res
 }
 
-func (m *Module) AddExportedFunc(name string, in []Type, out []Type, code *Code) Index {
-	funcID := m.AddFunc(in, out, code)
-	m.Exports = append(m.Exports, FuncExport{Name: name, Func: funcID})
-	return funcID
+func (m *Module) AddExportedFunc(name string, in []Type, out []Type) *Code {
+	c := m.AddFunc(in, out)
+	m.Exports = append(m.Exports, FuncExport{Name: name, Func: c.Func})
+	return c
 }
 
 func (m *Module) wasmHeader(buf []byte) []byte {
